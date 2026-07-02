@@ -2,17 +2,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from app.core.config import settings
 
 import bcrypt
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login"
-)
+# HTTP Bearer scheme — chỉ hiển thị một field Value trong Swagger Authorize
+bearer_scheme = HTTPBearer(auto_error=True)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against its hash using native bcrypt."""
@@ -87,15 +84,18 @@ def decode_token(token: str) -> dict[str, Any]:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-# Dependency for current user extraction (implemented as a placeholder for now, gets user_id and role)
-async def get_current_user_claims(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
-    """Dependency to extract user claims from JWT token."""
+# Dependency for current user extraction
+async def get_current_user_claims(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
+) -> dict[str, Any]:
+    """Dependency to extract user claims from JWT Bearer token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        token = credentials.credentials
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
@@ -116,3 +116,4 @@ class RoleChecker:
                 detail="You do not have permission to access this resource"
             )
         return claims
+

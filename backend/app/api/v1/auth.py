@@ -46,12 +46,12 @@ async def register(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        data = await auth_service.register_user(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    data = await auth_service.register_user(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return RegisterResponse(success=True, data=data)
 
 @router.post(
@@ -69,12 +69,14 @@ async def login(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        data = await auth_service.login_user(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    # Gọi trực tiếp (không dùng async with db.begin()) vì service tự commit
+    # trong trường hợp thất bại để lưu số lần đăng nhập sai và lockout
+    data = await auth_service.login_user(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return LoginResponse(success=True, data=data)
 
 @router.post(
@@ -92,12 +94,12 @@ async def google_login(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        data = await auth_service.google_oauth_login(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    data = await auth_service.google_oauth_login(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return GoogleLoginResponse(success=True, data=data)
 
 @router.post(
@@ -115,12 +117,12 @@ async def refresh_token(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        data = await auth_service.refresh_token_session(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    data = await auth_service.refresh_token_session(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return TokenRefreshResponse(success=True, data=data)
 
 @router.post(
@@ -139,13 +141,13 @@ async def logout(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        await auth_service.logout_user(
-            refresh_token=payload.refresh_token,
-            user_id=current_user.id,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    await auth_service.logout_user(
+        refresh_token=payload.refresh_token,
+        user_id=current_user.id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return MessageResponse(
         success=True, 
         data=MessageResponseData(message="Đăng xuất thành công")
@@ -166,12 +168,12 @@ async def forgot_password(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        await auth_service.forgot_password(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    await auth_service.forgot_password(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return MessageResponse(
         success=True, 
         data=MessageResponseData(message="Nếu tài khoản tồn tại, email khôi phục mật khẩu đã được gửi")
@@ -192,12 +194,12 @@ async def reset_password(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    async with db.begin():
-        await auth_service.reset_password(
-            payload=payload,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+    await auth_service.reset_password(
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    await db.commit()
     return MessageResponse(
         success=True, 
         data=MessageResponseData(message="Đặt lại mật khẩu thành công")
@@ -227,9 +229,9 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
     auth_service: IAuthService = Depends(get_auth_service)
 ) -> UserMeResponse:
-    async with db.begin():
-        profile = await auth_service.update_profile(
-            user_id=current_user.id,
-            payload=payload
-        )
+    profile = await auth_service.update_profile(
+        user_id=current_user.id,
+        payload=payload
+    )
+    await db.commit()
     return UserMeResponse(success=True, data={"user": profile})
