@@ -5,6 +5,12 @@ from app.services.impl.jsearch_service_impl import JSearchServiceImpl
 from app.services.interfaces.storage_service import StorageService
 from app.services.impl.r2_storage_service import R2StorageService
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends
+from app.core.database import get_db
+from app.services.interfaces.auth_service import IAuthService
+from app.services.impl.auth_service_impl import AuthServiceImpl
+
 # Singletons or instantiation functions
 _ai_provider = GeminiProvider()
 _jsearch_service = JSearchServiceImpl()
@@ -18,3 +24,48 @@ def get_jsearch_service() -> JSearchService:
 
 def get_storage_service() -> StorageService:
     return _storage_service
+
+def get_auth_service(db: AsyncSession = Depends(get_db)) -> IAuthService:
+    return AuthServiceImpl(db)
+
+import uuid
+from fastapi import HTTPException, status
+from app.core.security import get_current_user_claims
+from sqlalchemy import select
+from app.models.user import User
+
+async def get_current_user(
+    claims: dict = Depends(get_current_user_claims),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Dependency to retrieve the currently authenticated user from database."""
+    user_id_str = claims.get("sub")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Không tìm thấy thông tin người dùng trong token"
+        )
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Mã định danh người dùng không đúng định dạng"
+        )
+        
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Tài khoản không tồn tại"
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Tài khoản đã bị khóa"
+        )
+        
+    return user

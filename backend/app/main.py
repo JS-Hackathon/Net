@@ -36,6 +36,10 @@ app.add_middleware(
 # Register Exception Handlers
 register_exception_handlers(app)
 
+# Include API Routers
+from app.api.v1.auth import router as auth_router
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to MockAI API Service!"}

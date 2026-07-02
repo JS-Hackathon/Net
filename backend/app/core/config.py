@@ -10,19 +10,23 @@ class Settings(BaseSettings):
     ENV: str = Field(default="development")
     
     # Database
-    POSTGRES_USER: str = Field(default="root")
-    POSTGRES_PASSWORD: str = Field(default="123456")
-    POSTGRES_DB: str = Field(default="my_database")
-    DATABASE_URL: str = Field(default="postgresql+asyncpg://root:123456@localhost:5433/my_database")
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    DATABASE_URL: str
 
     # Security
-    JWT_SECRET: str = Field(default="4036717551323267566B5970337336763979244226452F484F4D514D58753978")
+    JWT_SECRET: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # External APIs
     GEMINI_API_KEY: str = Field(default="")
     JSEARCH_API_KEY: str = Field(default="")
+    
+    # Google OAuth2 Configuration
+    GOOGLE_CLIENT_ID: str = Field(default="")
+    GOOGLE_CLIENT_SECRET: str = Field(default="")
     
     # Cloudflare R2
     R2_BUCKET_NAME: str = Field(default="")
