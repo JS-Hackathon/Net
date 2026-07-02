@@ -25,13 +25,13 @@ Tài liệu này tổng hợp toàn bộ Tech Stack, cấu trúc thư mục, chu
 | **Documentation** | `org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2` | Tự động tạo Swagger UI để kiểm thử và tài liệu hóa API. |
 | **Utility** | `org.projectlombok:lombok` | Tự động sinh Getter, Setter, Constructor, Builder bằng annotation để giảm boilerplate code. |
 | **Communication** | `spring-boot-starter-mail` | Hỗ trợ gửi Email tự động (Ví dụ: gửi mã OTP). |
-| **Testing (Dev)** | `h2` (test scope) <br> `spring-boot-starter-test` <br> `spring-boot-starter-security-test` | Cơ sở dữ liệu In-Memory H2 hoặc các thư viện test phục vụ viết Unit Test & Integration Test. |
+| **Testing (Dev)** | `spring-boot-starter-test` <br> `spring-boot-starter-security-test` | Các thư viện test phục vụ viết Unit Test & Integration Test. |
 
 ---
 
 ## 2. Cấu Trúc Thư Mục Dự Án (Directory Structure)
 
-Dự án tuân thủ mô hình phân tầng chuẩn **Layered Architecture**. Toàn bộ mã nguồn Java nằm trong `src/main/java/com/classmanager/`.
+Dự án tuân thủ mô hình phân tầng chuẩn **Layered Architecture**. Toàn bộ mã nguồn Java nằm trong `src/main/java/com/classmanager/`. Tầng Service được phân tách rõ ràng giữa Interface và lớp triển khai (`impl`) để đảm bảo tính Loose Coupling.
 
 ```text
 backend/
@@ -79,9 +79,12 @@ backend/
 │   │   │   │   ├── JwtUtil.java
 │   │   │   │   └── SecurityUtil.java
 │   │   │   │
-│   │   │   └── service/               # Tầng Logic nghiệp vụ: Xử lý nghiệp vụ chính của ứng dụng
+│   │   │   └── service/               # Tầng Logic nghiệp vụ (Chứa các Service Interface bên ngoài)
 │   │   │       ├── AuthService.java
-│   │   │       └── UserService.java
+│   │   │       ├── UserService.java
+│   │   │       └── impl/              # Thư mục chứa các lớp triển khai thực tế của Service
+│   │   │           ├── AuthServiceImpl.java
+│   │   │           └── UserServiceImpl.java
 │   │   │
 │   │   └── resources/
 │   │       ├── application.properties # File cấu hình môi trường của Spring Boot
@@ -102,7 +105,8 @@ backend/
 | **Package** | Viết thường toàn bộ, dạng số ít. | `com.classmanager.controller`<br>`com.classmanager.entity` |
 | **Entity Class** | PascalCase, số ít. Trùng tên với thực thể trong DB. | `User.java`, `Course.java`, `CourseModule.java` |
 | **Controller Class** | PascalCase, kết thúc bằng chữ `Controller`. | `AuthController.java`, `CourseController.java` |
-| **Service Class** | PascalCase, kết thúc bằng chữ `Service`. <br>*(Trực tiếp tạo Service class không cần Interface trừ khi có nhiều Impls)* | `AuthService.java`, `CourseService.java` |
+| **Service Interface** | Interface, PascalCase, kết thúc bằng chữ `Service`, bắt đầu bằng chữ `I`. | `IAuthService.java`, `ICourseService.java` |
+| **Service Class** | PascalCase, kết thúc bằng chữ `Impl`. | `AuthServiceImpl.java`, `CourseServiceImpl.java` |
 | **Repository Class** | Interface, PascalCase, kết thúc bằng chữ `Repository`. | `UserRepository.java`, `CourseRepository.java` |
 | **DTO Class** | PascalCase, kết thúc bằng chữ `Request` hoặc `Response`. | `LoginRequest.java`, `UserResponse.java` |
 | **Enum Class** | PascalCase, đại diện cho tập hằng số logic. | `Role.java`, `UserStatus.java` |
@@ -369,7 +373,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(path = "/api/auth")
+@RequestMapping(path = "/api/v1/auth")
 @RequiredArgsConstructor
 @Tag(name = "Auth", description = "Các API xác thực tài khoản")
 public class AuthController {
