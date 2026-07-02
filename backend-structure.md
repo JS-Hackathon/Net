@@ -80,8 +80,8 @@ backend/
 │   │   │   │   └── SecurityUtil.java
 │   │   │   │
 │   │   │   └── service/               # Tầng Logic nghiệp vụ (Chứa các Service Interface bên ngoài)
-│   │   │       ├── AuthService.java
-│   │   │       ├── UserService.java
+│   │   │       ├── IAuthService.java
+│   │   │       ├── IUserService.java
 │   │   │       └── impl/              # Thư mục chứa các lớp triển khai thực tế của Service
 │   │   │           ├── AuthServiceImpl.java
 │   │   │           └── UserServiceImpl.java
