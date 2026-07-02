@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Brand Colors */
+  --color-primary: #0897c8;
+  --color-secondary: #f28020;
+  --color-tertiary: #75bb47;
+
+  /* System States */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* UI Tokens matching shadcn/ui */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --background: #fbf9f8;
+  --foreground: #1b1c1c;
+  
+  --card: #f6f3f2;
+  --card-foreground: #1b1c1c;
+  
+  --popover: #ffffff;
+  --popover-foreground: #1b1c1c;
+  
+  --primary: #0897c8;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #f28020;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #f6f3f2;
+  --muted-foreground: #8e8d99;
+  
+  --accent: #f0eded;
+  --accent-foreground: #1b1c1c;
+  
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  
+  --border: #c7c4d8;
+  --input: #c7c4d8;
+  --ring: #0897c8;
+  --radius: 1rem;
+}
+
+.dark {
+  --background: #111212;
+  --foreground: #fbf9f8;
+  
+  --card: #1c1d1d;
+  --card-foreground: #fbf9f8;
+  
+  --popover: #111212;
+  --popover-foreground: #fbf9f8;
+  
+  --primary: #0897c8;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #f28020;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #1c1d1d;
+  --muted-foreground: #8e8d99;
+  
+  --accent: #262727;
+  --accent-foreground: #fbf9f8;
+  
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  
+  --border: #333535;
+  --input: #333535;
+  --ring: #0897c8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-200;
+  }
+}
+
+/* NProgress styling integration */
+#nprogress .bar {
+  background: var(--primary) !important;
+  height: 3px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--primary), 0 0 5px var(--primary) !important;
+}
