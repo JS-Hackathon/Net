@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, engine
 from app.core.dependencies import get_ai_provider, get_jsearch_service
 from app.exceptions.handlers import register_exception_handlers
 
@@ -19,11 +20,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown checks: surface config + DB connectivity loudly so a
+    misconfigured environment fails at boot instead of as an opaque 500 later."""
+    origins = [o for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+    logger.info("=" * 64)
+    logger.info(f"MockAI backend starting — ENV={settings.ENV}")
+    logger.info(f"CORS allowed origins: {origins}")
+    logger.info(
+        "Integrations configured — gemini=%s jsearch=%s google=%s r2=%s",
+        bool(settings.GEMINI_API_KEY), bool(settings.JSEARCH_API_KEY),
+        bool(settings.GOOGLE_CLIENT_ID), bool(settings.R2_BUCKET_NAME),
+    )
+    if settings.ENV != "production":
+        logger.warning("ENV is not 'production' — debug mode leaks tracebacks and "
+                       "drops CORS headers on 500s. Set ENV=production when deployed.")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("Database connection: OK")
+    except Exception as e:  # noqa: BLE001 - report loudly, let /health be source of truth
+        logger.error("!" * 64)
+        logger.error(f"DATABASE CONNECTION FAILED at startup: {e}")
+        logger.error("Hints: is Postgres up ('docker compose up -d')? Does DATABASE_URL "
+                     "point at the right host/port? On Windows use 127.0.0.1 (not "
+                     "localhost) and port 5433.")
+        logger.error("!" * 64)
+    logger.info("=" * 64)
+    yield
+    await engine.dispose()
+    logger.info("MockAI backend stopped — DB engine disposed.")
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="AI-powered Career Copilot Backend",
     version="1.0.0",
-    debug=True if settings.ENV == "development" else False
+    debug=True if settings.ENV == "development" else False,
+    lifespan=lifespan,
 )
 
 # CORS Configuration

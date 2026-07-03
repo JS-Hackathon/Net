@@ -1,6 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MockAI Backend"
@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     
     # CORS
     ALLOWED_ORIGINS: str = Field(default="http://localhost:3000")
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _require_async_driver(cls, v: str) -> str:
+        # The app + Alembic use an async engine. A sync URL (e.g. plain
+        # "postgresql://") silently hangs or fails, so fail fast with a clear hint.
+        if "+asyncpg" not in v:
+            raise ValueError(
+                "DATABASE_URL must use the asyncpg driver — expected "
+                "'postgresql+asyncpg://...' but got a URL without '+asyncpg'."
+            )
+        return v
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env"),
