@@ -32,7 +32,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           {children}
-          <Toaster richColors position="top-right" closeButton />
+          <Toaster richColors position="bottom-right" closeButton />
         </AuthProvider>
       </body>
     </html>
