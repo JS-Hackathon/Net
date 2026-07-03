@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuthStore } from "@/lib/store/authStore";
+import api from "@/lib/axios";
 import { toast } from "sonner";
 import { 
   User as UserIcon, 
@@ -14,7 +16,8 @@ import {
   Save, 
   Camera, 
   Calendar, 
-  Loader2 
+  Loader2,
+  Home
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -23,6 +26,8 @@ export default function ProfilePage() {
   
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -35,6 +40,7 @@ export default function ProfilePage() {
     if (user) {
       setFullName(user.fullName || "");
       setAvatarUrl(user.avatarUrl || "");
+      setPreviewUrl(user.avatarUrl || "");
     } else if (isInitialized && !user) {
       // Nếu đã chạy kiểm tra đăng nhập nhưng không tìm thấy user, chuyển hướng về login
       router.push("/login");
@@ -50,9 +56,28 @@ export default function ProfilePage() {
 
     setIsUpdating(true);
     try {
-      await updateProfile({ fullName, avatarUrl });
+      let finalAvatarUrl = avatarUrl;
+      
+      if (avatarFile) {
+        const formData = new FormData();
+        formData.append("file", avatarFile);
+        
+        const uploadRes = await api.post("/api/v1/upload", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        
+        if (uploadRes.data?.success) {
+          finalAvatarUrl = uploadRes.data.data.url;
+          setAvatarUrl(finalAvatarUrl);
+        }
+      }
+
+      await updateProfile({ fullName, avatarUrl: finalAvatarUrl });
       toast.success("Cập nhật thông tin hồ sơ thành công!");
       setIsEditing(false);
+      setAvatarFile(null);
     } catch (error: any) {
       const msg = error.response?.data?.message || "Cập nhật hồ sơ thất bại";
       toast.error(msg);
@@ -100,20 +125,29 @@ export default function ProfilePage() {
       {/* Header Bar */}
       <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-primary to-secondary flex items-center justify-center font-bold text-white text-md">
               M
             </div>
             <span className="font-bold tracking-wide">MockAI Candidate Portal</span>
-          </div>
+          </Link>
           
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm font-semibold hover:text-red-500 hover:border-red-200 dark:hover:border-red-950 transition duration-200"
-          >
-            <LogOut className="h-4 w-4" />
-            Đăng xuất
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:border-primary/30 transition duration-200"
+            >
+              <Home className="h-4 w-4" />
+              Trang chủ
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm font-semibold hover:text-red-500 hover:border-red-200 dark:hover:border-red-950 transition duration-200"
+            >
+              <LogOut className="h-4 w-4" />
+              Đăng xuất
+            </button>
+          </div>
         </div>
       </header>
 
@@ -124,16 +158,21 @@ export default function ProfilePage() {
           <div className="flex flex-col items-center text-center space-y-4">
             {/* Avatar container */}
             <div className="relative group">
-              {avatarUrl ? (
+              {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={avatarUrl}
+                  src={previewUrl}
                   alt={user.fullName}
                   className="h-24 w-24 rounded-full object-cover border-4 border-zinc-100 dark:border-zinc-800"
                 />
               ) : (
                 <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-primary/20 to-secondary/20 border-4 border-zinc-100 dark:border-zinc-800 text-primary flex items-center justify-center font-bold text-2xl">
                   {getInitials(user.fullName)}
+                </div>
+              )}
+              {isEditing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="h-6 w-6 text-white" />
                 </div>
               )}
             </div>
@@ -207,16 +246,23 @@ export default function ProfilePage() {
               {/* Avatar Url */}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                  Liên kết ảnh đại diện (Avatar URL)
+                  Ảnh đại diện
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  disabled={!isEditing || isUpdating}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 focus:bg-white dark:focus:bg-black focus:outline-none focus:ring-2 focus:ring-primary/45 disabled:opacity-75 disabled:cursor-not-allowed transition duration-200"
-                />
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setAvatarFile(file);
+                        setPreviewUrl(URL.createObjectURL(file));
+                      }
+                    }}
+                    disabled={!isEditing || isUpdating}
+                    className="w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
 
               {/* Action buttons */}
@@ -239,6 +285,8 @@ export default function ProfilePage() {
                     onClick={() => {
                       setFullName(user.fullName || "");
                       setAvatarUrl(user.avatarUrl || "");
+                      setPreviewUrl(user.avatarUrl || "");
+                      setAvatarFile(null);
                       setIsEditing(false);
                     }}
                     disabled={isUpdating}

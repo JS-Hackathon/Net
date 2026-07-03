@@ -17,7 +17,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [mockGoogleEmail, setMockGoogleEmail] = useState("");
   const [showMockGoogle, setShowMockGoogle] = useState(false);
 
@@ -39,7 +39,7 @@ export default function RegisterPage() {
   // Nếu đã đăng nhập thì tự động chuyển về trang chủ hoặc profile
   useEffect(() => {
     if (user) {
-      router.push("/profile");
+      router.push("/");
     }
   }, [user, router]);
 
@@ -77,7 +77,7 @@ export default function RegisterPage() {
         termsAccepted,
       });
       toast.success("Đăng ký tài khoản ứng viên thành công!");
-      router.push("/profile");
+      router.push("/login");
     } catch (error: any) {
       const msg = error.response?.data?.message || "Đăng ký thất bại. Email có thể đã được sử dụng.";
       toast.error(msg);
@@ -91,7 +91,7 @@ export default function RegisterPage() {
     try {
       await googleLogin({ googleToken: token });
       toast.success("Đăng ký qua tài khoản Google thành công!");
-      router.push("/profile");
+      router.push("/");
     } catch (error: any) {
       const msg = error.response?.data?.message || "Đăng ký qua Google thất bại";
       toast.error(msg);
@@ -107,7 +107,7 @@ export default function RegisterPage() {
         {/* Glow Effects */}
         <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] rounded-full bg-primary/20 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] rounded-full bg-secondary/15 blur-[120px] pointer-events-none" />
-        
+
         {/* Logo */}
         <div className="flex items-center gap-2 z-10">
           <Link href="/login" className="flex items-center gap-2">
@@ -287,9 +287,8 @@ export default function RegisterPage() {
           <div className="space-y-3">
             {/* Google Signup Button */}
             <button
-              onClick={() => {
-                setShowMockGoogle(!showMockGoogle);
-              }}
+              type="button"
+              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/google/login"}
               disabled={isLoading || isSubmitting}
               className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition duration-200"
             >

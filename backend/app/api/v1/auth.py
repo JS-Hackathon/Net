@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+import urllib.parse
 
 from app.core.database import get_db
 from app.core.dependencies import get_auth_service, get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth import (
     UserRegisterRequest,
@@ -79,28 +82,52 @@ async def login(
     await db.commit()
     return LoginResponse(success=True, data=data)
 
-@router.post(
-    "/google",
-    response_model=GoogleLoginResponse,
-    summary="Đăng nhập qua Google OAuth",
-    description="Xác thực tài khoản bằng Google ID Token. Tạo tài khoản tự động nếu chưa tồn tại."
+@router.get(
+    "/google/login",
+    summary="Chuyển hướng người dùng sang trang Đăng nhập Google",
+    description="Sinh ra URL OAuth2 chứa Client ID và scope, sau đó redirect sang Google."
 )
-async def google_login(
+async def google_login_redirect():
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(url)
+
+@router.get(
+    "/google/callback",
+    summary="Nhận Authorization Code từ Google",
+    description="Nhận authorization code, đổi lấy token và tự động tạo session/user."
+)
+async def google_callback(
     request: Request,
-    payload: GoogleLoginRequest,
+    code: str,
     db: AsyncSession = Depends(get_db),
     auth_service: IAuthService = Depends(get_auth_service)
-) -> GoogleLoginResponse:
+):
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    data = await auth_service.google_oauth_login(
-        payload=payload,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
-    await db.commit()
-    return GoogleLoginResponse(success=True, data=data)
+    try:
+        data = await auth_service.google_oauth_login(
+            code=code,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        await db.commit()
+        # Redirect về frontend kèm theo access_token và refresh_token
+        redirect_url = f"{settings.FRONTEND_URL}/login-success?access_token={data.access_token}&refresh_token={data.refresh_token}"
+        return RedirectResponse(redirect_url)
+    except Exception as e:
+        await db.rollback()
+        # Redirect về frontend kèm tham số lỗi (nếu cần)
+        redirect_url = f"{settings.FRONTEND_URL}/login?error=google_auth_failed"
+        return RedirectResponse(redirect_url)
 
 @router.post(
     "/refresh",

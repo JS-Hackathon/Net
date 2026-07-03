@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # Google OAuth2 Configuration
     GOOGLE_CLIENT_ID: str = Field(default="")
     GOOGLE_CLIENT_SECRET: str = Field(default="")
+    GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:8000/api/v1/auth/google/callback")
+    FRONTEND_URL: str = Field(default="http://localhost:3000")
     
     # Cloudflare R2
     R2_BUCKET_NAME: str = Field(default="")

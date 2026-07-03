@@ -51,14 +51,14 @@ class IAuthService(Protocol):
 
     async def google_oauth_login(
         self, 
-        payload: GoogleLoginRequest, 
+        code: str, 
         ip_address: str | None = None, 
         user_agent: str | None = None
     ) -> AuthResponseData:
         """Đăng nhập qua tài khoản Google.
 
         Args:
-            payload (GoogleLoginRequest): Google ID Token và thông tin bổ sung.
+            code (str): Authorization code từ Google.
             ip_address (str | None): Địa chỉ IP thực hiện yêu cầu.
             user_agent (str | None): Thiết bị thực hiện yêu cầu.
 

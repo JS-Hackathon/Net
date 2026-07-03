@@ -1,6 +1,8 @@
 import logging
+import os
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,8 +40,17 @@ register_exception_handlers(app)
 
 # Include API Routers
 from app.api.v1.auth import router as auth_router
+from app.api.v1.upload import router as upload_router
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(upload_router, prefix=settings.API_V1_STR)
 
+# Mount static files directory
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    logger.info(f"Mounted static files from: {static_dir}")
+else:
+    logger.warning(f"Static directory not found: {static_dir}")
 @app.get("/")
 async def root():
     return {"message": "Welcome to MockAI API Service!"}

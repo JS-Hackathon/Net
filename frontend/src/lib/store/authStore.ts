@@ -1,11 +1,11 @@
 import { create } from "zustand";
-import { 
-  User, 
-  authService, 
-  LoginPayload, 
-  RegisterPayload, 
-  GoogleLoginPayload, 
-  ProfileUpdatePayload 
+import {
+  User,
+  authService,
+  LoginPayload,
+  RegisterPayload,
+  GoogleLoginPayload,
+  ProfileUpdatePayload
 } from "../services/auth";
 
 interface AuthState {
@@ -14,17 +14,17 @@ interface AuthState {
   refreshToken: string | null;
   isLoading: boolean;
   isInitialized: boolean;
-  
+
   setUser: (user: User | null) => void;
   setTokens: (accessToken: string | null, refreshToken: string | null) => void;
-  
+
   register: (payload: RegisterPayload) => Promise<void>;
   login: (payload: LoginPayload) => Promise<void>;
   googleLogin: (payload: GoogleLoginPayload) => Promise<void>;
   refreshAccessToken: () => Promise<string | null>;
   logout: () => Promise<void>;
   updateProfile: (payload: ProfileUpdatePayload) => Promise<void>;
-  checkAuth: () => Promise<void>;
+  checkAuth: (force?: boolean) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
 
   setUser: (user) => set({ user }),
-  
+
   setTokens: (accessToken, refreshToken) => {
     if (typeof window !== "undefined") {
       if (accessToken) {
@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else {
         localStorage.removeItem("access_token");
       }
-      
+
       if (refreshToken) {
         localStorage.setItem("refresh_token", refreshToken);
       } else {
@@ -57,8 +57,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const data = await authService.register(payload);
-      get().setTokens(data.accessToken, data.refreshToken);
-      set({ user: data.user });
     } finally {
       set({ isLoading: false });
     }
@@ -128,18 +126,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  checkAuth: async () => {
-    if (get().isInitialized) return;
-    
+  checkAuth: async (force: boolean = false) => {
+    if (get().isInitialized && !force) return;
+
     if (typeof window === "undefined") {
       set({ isInitialized: true });
       return;
     }
-    
+
     set({ isLoading: true });
     const accessToken = localStorage.getItem("access_token");
     const refreshToken = localStorage.getItem("refresh_token");
-    
+
     if (accessToken && refreshToken) {
       set({ accessToken, refreshToken });
       try {

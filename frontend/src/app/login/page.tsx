@@ -31,7 +31,7 @@ function LoginForm() {
   // Nếu đã đăng nhập thì tự động chuyển về trang chủ hoặc trang profile
   useEffect(() => {
     if (user) {
-      router.push("/profile");
+      router.push("/");
     }
   }, [user, router]);
 
@@ -46,7 +46,7 @@ function LoginForm() {
     try {
       await login({ email, password });
       toast.success("Đăng nhập thành công!");
-      router.push("/profile");
+      router.push("/");
     } catch (error: any) {
       const msg = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
       toast.error(msg);
@@ -60,7 +60,7 @@ function LoginForm() {
     try {
       await googleLogin({ googleToken: token });
       toast.success("Đăng nhập bằng Google thành công!");
-      router.push("/profile");
+      router.push("/");
     } catch (error: any) {
       const msg = error.response?.data?.message || "Xác thực qua tài khoản Google thất bại";
       toast.error(msg);
@@ -76,7 +76,7 @@ function LoginForm() {
         {/* Glow Effects */}
         <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] rounded-full bg-primary/20 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] rounded-full bg-secondary/15 blur-[120px] pointer-events-none" />
-        
+
         {/* Logo */}
         <div className="flex items-center gap-2 z-10">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center font-bold text-white text-xl shadow-lg">
@@ -190,16 +190,8 @@ function LoginForm() {
           <div className="space-y-3">
             {/* Google OAuth Button */}
             <button
-              onClick={() => {
-                // Trong môi trường hackathon / test nếu không cấu hình OAuth thì cho phép test mock
-                if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
-                  setShowMockGoogle(!showMockGoogle);
-                } else {
-                  // Gọi luồng Google OAuth thực tế
-                  toast.info("Chức năng Google OAuth chưa cấu hình client key. Đang hiển thị mock testing.");
-                  setShowMockGoogle(!showMockGoogle);
-                }
-              }}
+              type="button"
+              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/google/login"}
               disabled={isLoading || isSubmitting}
               className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition duration-200"
             >

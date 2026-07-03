@@ -226,7 +226,7 @@ class AuthServiceImpl(IAuthService):
 
     async def google_oauth_login(
         self, 
-        payload: GoogleLoginRequest, 
+        code: str, 
         ip_address: str | None = None, 
         user_agent: str | None = None
     ) -> AuthResponseData:
@@ -236,42 +236,52 @@ class AuthServiceImpl(IAuthService):
         google_id = None
         avatar_url = None
 
-        if payload.google_token.startswith("mock_") or not settings.GOOGLE_CLIENT_ID:
+        if code.startswith("mock_") or not settings.GOOGLE_CLIENT_ID:
             # Under dev/mock mode
-            email = payload.google_token.replace("mock_", "")
+            email = code.replace("mock_", "")
             if "@" not in email:
                 email = f"{email}@gmail.com"
             name = email.split("@")[0].capitalize()
-            google_id = f"g_{payload.google_token}"
+            google_id = f"g_{code}"
         else:
-            # Call Google OAuth API to verify token
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.get(
-                        "https://oauth2.googleapis.com/tokeninfo",
-                        params={"id_token": payload.google_token}
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    # 1. Exchange code for tokens
+                    token_data = {
+                        "code": code,
+                        "client_id": settings.GOOGLE_CLIENT_ID,
+                        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                        "grant_type": "authorization_code"
+                    }
+                    token_resp = await client.post("https://oauth2.googleapis.com/token", data=token_data)
+                    if token_resp.status_code != 200:
+                        raise AuthenticationError("Lỗi khi trao đổi Authorization Code với Google")
+                    
+                    token_json = token_resp.json()
+                    access_token = token_json.get("access_token")
+                    
+                    # 2. Get user info
+                    user_resp = await client.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {access_token}"}
                     )
-                    if resp.status_code != 200:
-                        raise AuthenticationError("Token Google không hợp lệ hoặc đã hết hạn")
-                    
-                    token_info = resp.json()
-                    
-                    # Verify audience
-                    aud = token_info.get("aud")
-                    if aud != settings.GOOGLE_CLIENT_ID:
-                        raise AuthenticationError("Google Token audience mismatch")
+                    if user_resp.status_code != 200:
+                        raise AuthenticationError("Không thể lấy thông tin người dùng từ Google")
                         
-                    email = token_info.get("email")
-                    name = token_info.get("name", email.split("@")[0])
-                    google_id = token_info.get("sub")
-                    avatar_url = token_info.get("picture")
+                    user_info = user_resp.json()
+                    email = user_info.get("email")
+                    name = user_info.get("name", email.split("@")[0] if email else None)
+                    google_id = user_info.get("sub")
+                    avatar_url = user_info.get("picture")
+                    
             except Exception as e:
                 await self._write_auth_log(
                     event_type="google_login",
                     success=False,
                     ip_address=ip_address,
                     user_agent=user_agent,
-                    error_message=f"Google verification exception: {str(e)}"
+                    error_message=f"Google code exchange exception: {str(e)}"
                 )
                 raise AuthenticationError("Xác thực qua tài khoản Google thất bại")
 
