@@ -110,7 +110,16 @@ class JobDiscoveryServiceImpl(IJobDiscoveryService):
             data = self._transform_jsearch(raw)
             if not data:
                 continue
-            await self.repo.upsert_job(data)
+            # Upsert each row inside a SAVEPOINT so a single malformed record
+            # (e.g. an unexpected value from the external API) rolls back only
+            # itself instead of poisoning the whole transaction and 500-ing.
+            try:
+                async with self.db.begin_nested():
+                    await self.repo.upsert_job(data)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    f"Skipping job '{data.get('external_job_id')}' — upsert failed: {e}"
+                )
 
     def _transform_jsearch(self, raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Normalize a raw JSearch job dict into our internal `jobs` schema."""
@@ -158,30 +167,51 @@ class JobDiscoveryServiceImpl(IJobDiscoveryService):
             skills = highlights.get("Qualifications") or []
 
         now = datetime.now(timezone.utc)
+        # Clip strings to their DB column limits and coerce salaries to int:
+        # real JSearch payloads can carry very long ids/titles and float salaries
+        # that would otherwise raise a DB truncation / type error on insert.
         return {
-            "external_job_id": str(external_id),
-            "title": title,
-            "company_name": company,
-            "company_logo_url": raw.get("employer_logo"),
-            "location": location,
-            "job_type": (raw.get("job_employment_type") or "").lower() or None,
-            "employment_type": employment_type,
-            "experience_level": self._map_experience_level(raw),
-            "salary_min": raw.get("job_min_salary"),
-            "salary_max": raw.get("job_max_salary"),
-            "salary_currency": raw.get("job_salary_currency") or "USD",
+            "external_job_id": self._clip(str(external_id), 255),
+            "title": self._clip(title, 500),
+            "company_name": self._clip(company, 255),
+            "company_logo_url": self._clip(raw.get("employer_logo"), 500),
+            "location": self._clip(location, 255),
+            "job_type": self._clip((raw.get("job_employment_type") or "").lower() or None, 100),
+            "employment_type": self._clip(employment_type, 100),
+            "experience_level": self._clip(self._map_experience_level(raw), 100),
+            "salary_min": self._to_int(raw.get("job_min_salary")),
+            "salary_max": self._to_int(raw.get("job_max_salary")),
+            "salary_currency": self._clip(raw.get("job_salary_currency") or "USD", 10),
             "description": raw.get("job_description"),
             "requirements": self._join_highlights(raw, "Qualifications"),
             "benefits": self._join_highlights(raw, "Benefits"),
             "skills_required": skills if isinstance(skills, list) else [],
-            "industry": raw.get("employer_company_type"),
+            "industry": self._clip(raw.get("employer_company_type"), 255),
             "posted_date": posted_date,
-            "application_url": raw.get("job_apply_link"),
-            "source_platform": raw.get("job_publisher"),
+            "application_url": self._clip(raw.get("job_apply_link"), 500),
+            "source_platform": self._clip(raw.get("job_publisher"), 100),
             "cached_at": now,
             "expires_at": now + timedelta(hours=CACHE_TTL_HOURS),
             "is_active": True,
         }
+
+    @staticmethod
+    def _clip(value: Optional[str], max_len: int) -> Optional[str]:
+        """Truncate a string to fit its column, preserving None."""
+        if value is None:
+            return None
+        text = str(value)
+        return text[:max_len] if len(text) > max_len else text
+
+    @staticmethod
+    def _to_int(value: Any) -> Optional[int]:
+        """Coerce JSearch numeric fields (which may be float/str) to int, or None."""
+        if value is None:
+            return None
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
 
     @staticmethod
     def _join_highlights(raw: Dict[str, Any], key: str) -> Optional[str]:

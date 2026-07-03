@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, Building2, MapPin, AlertTriangle, ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { matchService, MatchListItem } from "@/lib/services/matches";
-import { JobsNav } from "@/components/jobs/JobsNav";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { MatchScoreIndicator } from "@/components/jobs/MatchScoreIndicator";
 
 export default function MatchesPage() {
@@ -54,7 +54,7 @@ export default function MatchesPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
-      <JobsNav />
+      <AppHeader />
 
       <main className="max-w-4xl mx-auto px-6 mt-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

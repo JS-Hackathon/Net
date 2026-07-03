@@ -2,15 +2,14 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/lib/store/authStore";
+import { AppHeader } from "@/components/layout/AppHeader";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { 
-  User as UserIcon, 
-  Shield, 
-  LogOut, 
-  Save, 
+  User as UserIcon,
+  Shield,
+  Save,
   Loader2,
   FileText,
   Download,
@@ -37,7 +36,7 @@ type RecordStringUnknown = any;
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, updateProfile, logout, checkAuth, isInitialized, isLoading } = useAuthStore();
+  const { user, updateProfile, checkAuth, isInitialized, isLoading } = useAuthStore();
   
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -163,16 +162,6 @@ export default function ProfilePage() {
       toast.error(msg);
     } finally {
       setIsUpdatingAccount(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success("Đăng xuất thành công!");
-      router.push("/login");
-    } catch (error: unknown) {
-      toast.error("Lỗi khi đăng xuất");
     }
   };
 
@@ -497,51 +486,8 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-12 select-none">
       
-      {/* Header Bar */}
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-primary to-secondary flex items-center justify-center font-bold text-white text-md">
-              M
-            </div>
-            <span className="font-bold tracking-wide">MockAI Candidate Portal</span>
-          </Link>
-          
-          <div className="flex items-center gap-3">
-            <Link
-              href="/jobs"
-              className="flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-primary transition duration-200"
-            >
-              <Briefcase className="h-4 w-4" />
-              Tìm việc
-            </Link>
-            <Link
-              href="/matches"
-              className="py-2 px-3.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-primary transition duration-200"
-            >
-              Kết quả match
-            </Link>
-
-            <button
-              onClick={() => { setActiveTab("account"); setReviewAnalysis(null); }}
-              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition duration-200 cursor-pointer ${
-                activeTab === "account"
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              Cài đặt tài khoản
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm font-semibold hover:text-red-500 hover:border-red-200 dark:hover:border-red-950 transition duration-200"
-            >
-              <LogOut className="h-4 w-4" />
-              Đăng xuất
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Shared application header */}
+      <AppHeader />
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 mt-8 space-y-6">
@@ -600,6 +546,16 @@ export default function ProfilePage() {
               }`}
             >
               Hồ sơ năng lực
+            </button>
+            <button
+              onClick={() => { setActiveTab("account"); setReviewAnalysis(null); }}
+              className={`px-4.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer ${
+                activeTab === "account"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              Tài khoản
             </button>
           </div>
         </div>

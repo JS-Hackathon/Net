@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search, Loader2, Sparkles, Briefcase } from "lucide-react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { jobService, JobSummary, JobRecommendation, Pagination } from "@/lib/services/jobs";
-import { JobsNav } from "@/components/jobs/JobsNav";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { JobCard } from "@/components/jobs/JobCard";
 import { JobSearchFilters, FilterState } from "@/components/jobs/JobSearchFilters";
 
@@ -105,7 +105,7 @@ export default function JobsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
-      <JobsNav />
+      <AppHeader />
 
       <main className="max-w-6xl mx-auto px-6 mt-8 space-y-6">
         {/* Search bar */}

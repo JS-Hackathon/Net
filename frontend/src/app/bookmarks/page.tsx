@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Bookmark } from "lucide-react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { jobService, BookmarkItem, JobSummary } from "@/lib/services/jobs";
-import { JobsNav } from "@/components/jobs/JobsNav";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { JobCard } from "@/components/jobs/JobCard";
 
 export default function BookmarksPage() {
@@ -62,7 +62,7 @@ export default function BookmarksPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
-      <JobsNav />
+      <AppHeader />
 
       <main className="max-w-4xl mx-auto px-6 mt-8 space-y-6">
         <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">

@@ -10,7 +10,7 @@ import {
 import { useAuthStore } from "@/lib/store/authStore";
 import { jobService, JobDetail } from "@/lib/services/jobs";
 import { matchService } from "@/lib/services/matches";
-import { JobsNav } from "@/components/jobs/JobsNav";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -81,7 +81,7 @@ export default function JobDetailPage() {
   if (!job) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-black">
-        <JobsNav />
+        <AppHeader />
         <div className="max-w-3xl mx-auto px-6 mt-16 text-center text-muted-foreground">
           <p className="font-semibold">Không tìm thấy việc làm.</p>
         </div>
@@ -91,7 +91,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
-      <JobsNav />
+      <AppHeader />
 
       <main className="max-w-4xl mx-auto px-6 mt-6 space-y-6">
         <button
