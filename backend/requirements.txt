@@ -10,3 +10,6 @@ passlib[bcrypt]
 httpx
 pytest
 pytest-asyncio
+pypdf>=4.0.0
+python-docx>=1.1.0
+python-multipart

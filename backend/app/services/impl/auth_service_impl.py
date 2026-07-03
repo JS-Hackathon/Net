@@ -18,6 +18,7 @@ from app.models.user import User
 from app.models.refresh_token import RefreshToken
 from app.models.password_reset_token import PasswordResetToken
 from app.models.auth_log import AuthLog
+from app.models.candidate_profile import CandidateProfile, ProfileCompleteness
 from app.schemas.auth import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -31,6 +32,122 @@ from app.schemas.auth import (
     UserProfileResponse
 )
 from app.services.interfaces.auth_service import IAuthService
+
+async def _create_default_profile(db: AsyncSession, user_id: uuid.UUID, full_name: str | None, email: str | None) -> None:
+    # 1. Create Profile
+    profile = CandidateProfile(
+        user_id=user_id,
+        full_name=full_name,
+        email=email,
+        completeness_score=0.00,
+        profile_strength="basic",
+        is_public=False,
+        is_searchable=True,
+        work_experience=[],
+        education=[],
+        technical_skills=[],
+        soft_skills=[],
+        certifications=[],
+        languages=[],
+        projects=[],
+        achievements=[]
+    )
+    db.add(profile)
+    await db.flush()
+
+    # 2. Calculate initial completeness records
+    p_fields = ["full_name", "email", "phone", "location"]
+    p_missing = []
+    p_sugs = []
+    
+    if not full_name:
+        p_missing.append("full_name")
+        p_sugs.append("Vui lòng bổ sung Họ và tên")
+    if not email:
+        p_missing.append("email")
+        p_sugs.append("Vui lòng bổ sung Email liên hệ")
+    
+    p_missing.extend(["phone", "location"])
+    p_sugs.extend(["Vui lòng bổ sung Số điện thoại", "Vui lòng bổ sung Địa chỉ sinh sống"])
+    
+    p_score = ((len(p_fields) - len(p_missing)) / len(p_fields)) * 25.0
+    
+    # Work Experience
+    w_score = 0.0
+    w_missing = ["work_experience"]
+    w_sugs = ["Vui lòng thêm ít nhất một kinh nghiệm làm việc"]
+    
+    # Education
+    e_score = 0.0
+    e_missing = ["education"]
+    e_sugs = ["Vui lòng thêm thông tin học vấn học tập"]
+    
+    # Skills
+    s_score = 0.0
+    s_missing = ["technical_skills"]
+    s_sugs = ["Nên bổ sung tối thiểu 5 kỹ năng chuyên môn khác nhau"]
+    
+    # Others
+    others_score = 0.0
+    others_sugs = [
+        "Bổ sung chứng chỉ chuyên môn (nếu có)",
+        "Thêm các dự án thực tế để tăng tính cạnh tranh",
+        "Thêm các chứng chỉ ngoại ngữ và mức độ thành thạo",
+        "Thêm giải thưởng, hoạt động ngoại khóa"
+    ]
+    
+    db.add(ProfileCompleteness(
+        profile_id=profile.id,
+        section_name="personal_info",
+        completeness_percentage=p_score,
+        missing_fields=p_missing,
+        suggestions=p_sugs
+    ))
+    
+    db.add(ProfileCompleteness(
+        profile_id=profile.id,
+        section_name="work_experience",
+        completeness_percentage=w_score,
+        missing_fields=w_missing,
+        suggestions=w_sugs
+    ))
+    
+    db.add(ProfileCompleteness(
+        profile_id=profile.id,
+        section_name="education",
+        completeness_percentage=e_score,
+        missing_fields=e_missing,
+        suggestions=e_sugs
+    ))
+    
+    db.add(ProfileCompleteness(
+        profile_id=profile.id,
+        section_name="skills",
+        completeness_percentage=s_score,
+        missing_fields=s_missing,
+        suggestions=s_sugs
+    ))
+    
+    db.add(ProfileCompleteness(
+        profile_id=profile.id,
+        section_name="others",
+        completeness_percentage=others_score,
+        missing_fields=[],
+        suggestions=others_sugs
+    ))
+    
+    total_score = p_score + w_score + e_score + s_score + others_score
+    profile.completeness_score = min(100.0, total_score)
+    if total_score <= 40:
+        profile.profile_strength = "basic"
+    elif total_score <= 70:
+        profile.profile_strength = "good"
+    elif total_score <= 90:
+        profile.profile_strength = "strong"
+    else:
+        profile.profile_strength = "excellent"
+        
+    await db.flush()
 
 class AuthServiceImpl(IAuthService):
     def __init__(self, db: AsyncSession):
@@ -90,6 +207,9 @@ class AuthServiceImpl(IAuthService):
         )
         self.db.add(new_user)
         await self.db.flush()
+
+        # Create candidate profile row
+        await _create_default_profile(self.db, new_user.id, new_user.full_name, new_user.email)
 
         # Generate tokens
         access_token = create_access_token(
@@ -307,6 +427,10 @@ class AuthServiceImpl(IAuthService):
             )
             self.db.add(user)
             await self.db.flush()
+            
+            # Create candidate profile row
+            await _create_default_profile(self.db, user.id, user.full_name, user.email)
+            
             is_new_user = True
         else:
             # Link Google account if not linked

@@ -38,11 +38,29 @@ app.add_middleware(
 # Register Exception Handlers
 register_exception_handlers(app)
 
+# Mount Static Files (for uploads and exports fallbacks)
+from fastapi.staticfiles import StaticFiles
+import os
+
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+os.makedirs(static_dir, exist_ok=True)
+os.makedirs(os.path.join(static_dir, "uploads"), exist_ok=True)
+os.makedirs(os.path.join(static_dir, "exports"), exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 # Include API Routers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.upload import router as upload_router
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(upload_router, prefix=settings.API_V1_STR)
+from app.api.v1.resumes import router as resumes_router
+from app.api.v1.analyses import router as analyses_router
+from app.api.v1.profiles import router as profiles_router
+
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(resumes_router, prefix=settings.API_V1_STR)
+app.include_router(analyses_router, prefix=settings.API_V1_STR)
+app.include_router(profiles_router, prefix=settings.API_V1_STR)
 
 # Mount static files directory
 static_dir = os.path.join(os.path.dirname(__file__), "static")

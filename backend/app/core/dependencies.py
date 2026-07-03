@@ -16,6 +16,13 @@ _ai_provider = GeminiProvider()
 _jsearch_service = JSearchServiceImpl()
 _storage_service = R2StorageService()
 
+from app.services.interfaces.resume_service import IResumeService
+from app.services.impl.resume_service_impl import ResumeServiceImpl
+from app.services.interfaces.resume_analysis_service import IResumeAnalysisService
+from app.services.impl.resume_analysis_service_impl import ResumeAnalysisServiceImpl
+from app.services.interfaces.candidate_profile_service import ICandidateProfileService
+from app.services.impl.candidate_profile_service_impl import CandidateProfileServiceImpl
+
 def get_ai_provider() -> AIProvider:
     return _ai_provider
 
@@ -27,6 +34,24 @@ def get_storage_service() -> StorageService:
 
 def get_auth_service(db: AsyncSession = Depends(get_db)) -> IAuthService:
     return AuthServiceImpl(db)
+
+def get_resume_service(
+    db: AsyncSession = Depends(get_db),
+    storage = Depends(get_storage_service)
+) -> IResumeService:
+    return ResumeServiceImpl(db, storage)
+
+def get_resume_analysis_service(
+    db: AsyncSession = Depends(get_db),
+    storage = Depends(get_storage_service),
+    ai = Depends(get_ai_provider)
+) -> IResumeAnalysisService:
+    return ResumeAnalysisServiceImpl(db, storage, ai)
+
+def get_candidate_profile_service(
+    db: AsyncSession = Depends(get_db)
+) -> ICandidateProfileService:
+    return CandidateProfileServiceImpl(db)
 
 import uuid
 from fastapi import HTTPException, status

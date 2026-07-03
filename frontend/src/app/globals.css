@@ -104,13 +104,3 @@
     @apply bg-background text-foreground transition-colors duration-200;
   }
 }
-
-/* NProgress styling integration */
-#nprogress .bar {
-  background: var(--primary) !important;
-  height: 3px !important;
-}
-
-#nprogress .peg {
-  box-shadow: 0 0 10px var(--primary), 0 0 5px var(--primary) !important;
-}

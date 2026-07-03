@@ -15,6 +15,9 @@ from app.models.user import User
 from app.models.refresh_token import RefreshToken
 from app.models.password_reset_token import PasswordResetToken
 from app.models.auth_log import AuthLog
+from app.models.resume import Resume
+from app.models.resume_analysis import ResumeAnalysis, ParsingMetric
+from app.models.candidate_profile import CandidateProfile, ProfileCompleteness, ProfileUpdate
 
 # Thiết lập engine và session factory sử dụng NullPool cho quá trình chạy test
 db_module.engine = create_async_engine(
@@ -59,6 +62,12 @@ async def cleanup_db():
     yield
     async with async_session_factory() as session:
         async with session.begin():
+            await session.execute(delete(ProfileUpdate))
+            await session.execute(delete(ProfileCompleteness))
+            await session.execute(delete(CandidateProfile))
+            await session.execute(delete(ParsingMetric))
+            await session.execute(delete(ResumeAnalysis))
+            await session.execute(delete(Resume))
             await session.execute(delete(AuthLog))
             await session.execute(delete(PasswordResetToken))
             await session.execute(delete(RefreshToken))
