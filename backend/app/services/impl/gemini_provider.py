@@ -1,9 +1,11 @@
 import json
+import asyncio
 import logging
 from typing import Dict, Any
 import httpx
 from app.core.config import settings
 from app.services.interfaces.ai_provider import AIProvider
+from app.services.prompts.matching_prompts import build_matching_prompt, JOB_MATCHING_PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -52,42 +54,57 @@ class GeminiProvider(AIProvider):
                 logger.error(f"Gemini API parse_resume error: {e}", exc_info=True)
                 raise ValueError(f"Failed to parse resume with Gemini API: {str(e)}")
 
+    @property
+    def model_version(self) -> str:
+        return f"{self.model}"
+
+    @property
+    def matching_prompt_version(self) -> str:
+        return JOB_MATCHING_PROMPT_VERSION
+
     async def match_job(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a full structured job-candidate compatibility analysis.
+
+        The prompt requests the detailed schema defined in matching_prompts. The
+        request is retried once on failure (per NFR: retry AI failures).
+        """
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
 
         headers = {"Content-Type": "application/json"}
-        prompt = (
-            "Compare the candidate profile with the job description. "
-            "Return a structured JSON with keys: 'match_score' (integer between 0 and 100), "
-            "'strengths' (array of strings), 'weaknesses' (array of strings), and "
-            "'skill_gaps' (array of objects with 'skill', 'priority', 'suggestion'). "
-            "Return only the raw JSON.\n\n"
-            f"Candidate Profile:\n{json.dumps(profile)}\n\n"
-            f"Job Description:\n{json.dumps(job)}"
-        )
-        
+        prompt = build_matching_prompt(profile, job)
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]
             }],
             "generationConfig": {
+                # Low temperature for consistent, deterministic analysis.
+                "temperature": 0.2,
+                "topP": 0.8,
+                "maxOutputTokens": 2048,
                 "responseMimeType": "application/json"
             }
         }
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.url}?key={self.api_key}",
-                    json=payload,
-                    headers=headers,
-                    timeout=15.0
-                )
-                response.raise_for_status()
-                res_data = response.json()
-                content = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(content)
-            except Exception as e:
-                logger.error(f"Gemini API match_job error: {e}", exc_info=True)
-                raise ValueError(f"Failed to match job with Gemini API: {str(e)}")
+        last_error: Exception | None = None
+        for attempt in range(2):  # initial try + 1 retry
+            async with httpx.AsyncClient() as client:
+                try:
+                    response = await client.post(
+                        f"{self.url}?key={self.api_key}",
+                        json=payload,
+                        headers=headers,
+                        timeout=20.0
+                    )
+                    response.raise_for_status()
+                    res_data = response.json()
+                    content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(content)
+                except Exception as e:  # noqa: BLE001
+                    last_error = e
+                    logger.warning(f"Gemini match_job attempt {attempt + 1} failed: {e}")
+                    if attempt == 0:
+                        await asyncio.sleep(1.0)
+
+        logger.error(f"Gemini API match_job error after retries: {last_error}", exc_info=True)
+        raise ValueError(f"Failed to match job with Gemini API: {str(last_error)}")

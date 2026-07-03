@@ -1,6 +1,7 @@
 import logging
 import os
-from fastapi import FastAPI, Depends
+import time
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -35,40 +36,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request timing: expose per-request server time and log slow requests so we can
+# tell whether latency is server-side (DB/compute) or network/connection.
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Process-Time"] = f"{elapsed_ms:.1f}"
+    if elapsed_ms > 1000:
+        logger.warning(f"SLOW REQUEST {request.method} {request.url.path} took {elapsed_ms:.0f}ms")
+    return response
+
 # Register Exception Handlers
 register_exception_handlers(app)
 
 # Mount Static Files (for uploads and exports fallbacks)
-from fastapi.staticfiles import StaticFiles
-import os
-
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 os.makedirs(static_dir, exist_ok=True)
 os.makedirs(os.path.join(static_dir, "uploads"), exist_ok=True)
 os.makedirs(os.path.join(static_dir, "exports"), exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+logger.info(f"Mounted static files from: {static_dir}")
 
 # Include API Routers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.upload import router as upload_router
-app.include_router(auth_router, prefix=settings.API_V1_STR)
-app.include_router(upload_router, prefix=settings.API_V1_STR)
 from app.api.v1.resumes import router as resumes_router
 from app.api.v1.analyses import router as analyses_router
 from app.api.v1.profiles import router as profiles_router
+from app.api.v1.jobs import router as jobs_router
+from app.api.v1.matches import router as matches_router
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(upload_router, prefix=settings.API_V1_STR)
 app.include_router(resumes_router, prefix=settings.API_V1_STR)
 app.include_router(analyses_router, prefix=settings.API_V1_STR)
 app.include_router(profiles_router, prefix=settings.API_V1_STR)
+app.include_router(jobs_router, prefix=settings.API_V1_STR)
+app.include_router(matches_router, prefix=settings.API_V1_STR)
 
-# Mount static files directory
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info(f"Mounted static files from: {static_dir}")
-else:
-    logger.warning(f"Static directory not found: {static_dir}")
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to MockAI API Service!"}

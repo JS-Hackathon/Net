@@ -73,13 +73,14 @@ export default function ProfilePage() {
 
   const fetchCandidateData = async () => {
     try {
-      const resList = await resumeService.listResumes();
+      const [resList, prof, comp] = await Promise.all([
+        resumeService.listResumes(),
+        profileService.getProfile(),
+        profileService.getCompleteness()
+      ]);
+
       setResumes(resList);
-      
-      const prof = await profileService.getProfile();
       setProfile(prof);
-      
-      const comp = await profileService.getCompleteness();
       setCompleteness(comp);
 
       // Check if any resume is still processing on initial load
@@ -92,10 +93,6 @@ export default function ProfilePage() {
       console.error("Error loading profile data:", e);
     }
   };
-
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
 
   // Load account data
   useEffect(() => {
@@ -111,13 +108,20 @@ export default function ProfilePage() {
       if (previewUrl !== (user.avatarUrl || "")) {
         setPreviewUrl(user.avatarUrl || "");
       }
-      
-      fetchCandidateData();
     } else if (isInitialized && !user) {
       router.push("/login");
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [user, isInitialized, router]);
+
+  // Fetch candidate profile data once on mount when user is loaded
+  const hasFetched = useRef(false);
+  useEffect(() => {
+    if (user && !hasFetched.current) {
+      hasFetched.current = true;
+      fetchCandidateData();
+    }
+  }, [user]);
 
   const handleUpdateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -500,8 +504,20 @@ export default function ProfilePage() {
           </Link>
           
           <div className="flex items-center gap-3">
-            
-              
+            <Link
+              href="/jobs"
+              className="flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-primary transition duration-200"
+            >
+              <Briefcase className="h-4 w-4" />
+              Tìm việc
+            </Link>
+            <Link
+              href="/matches"
+              className="py-2 px-3.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-primary transition duration-200"
+            >
+              Kết quả match
+            </Link>
+
             <button
               onClick={() => { setActiveTab("account"); setReviewAnalysis(null); }}
               className={`py-2 px-3.5 rounded-xl text-xs font-bold transition duration-200 cursor-pointer ${

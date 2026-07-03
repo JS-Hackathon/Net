@@ -5,7 +5,7 @@ from app.core.config import settings
 # Create async engine with pooling configured
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True if settings.ENV == "development" else False,
+    echo=settings.SQL_ECHO,  # verbose SQL logging is opt-in (SQL_ECHO=true)
     pool_pre_ping=True,
     pool_size=20,
     max_overflow=10,

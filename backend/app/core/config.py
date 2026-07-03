@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     
     # Environment
     ENV: str = Field(default="development")
+    # Log every SQL statement (verbose; adds latency in dev). Off by default.
+    SQL_ECHO: bool = Field(default=False)
     
     # Database
     POSTGRES_USER: str
@@ -23,6 +25,9 @@ class Settings(BaseSettings):
     # External APIs
     GEMINI_API_KEY: str = Field(default="")
     JSEARCH_API_KEY: str = Field(default="")
+    # JSearch /search-v2 requires a country code + date_posted filter.
+    JSEARCH_COUNTRY: str = Field(default="vn")
+    JSEARCH_DATE_POSTED: str = Field(default="all")
     
     # Google OAuth2 Configuration
     GOOGLE_CLIENT_ID: str = Field(default="")
