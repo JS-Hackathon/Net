@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/store/authStore";
 import { toast } from "sonner";
-import { UserPlus, Mail, Lock, User, Check, ShieldCheck, ArrowRight, ShieldAlert } from "lucide-react";
+import { UserPlus, Mail, Lock, User, ArrowRight, ShieldAlert } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [mockGoogleEmail, setMockGoogleEmail] = useState("");
-  const [showMockGoogle, setShowMockGoogle] = useState(false);
+  const [showMockGoogle] = useState(false);
 
   // Mật khẩu có đạt chuẩn độ khó tối thiểu không
   const isPasswordStrong = (pw: string) => {
@@ -78,8 +78,9 @@ export default function RegisterPage() {
       });
       toast.success("Đăng ký tài khoản ứng viên thành công!");
       router.push("/login");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng ký thất bại. Email có thể đã được sử dụng.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng ký thất bại. Email có thể đã được sử dụng.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -92,8 +93,9 @@ export default function RegisterPage() {
       await googleLogin({ googleToken: token });
       toast.success("Đăng ký qua tài khoản Google thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng ký qua Google thất bại";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng ký qua Google thất bại";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);

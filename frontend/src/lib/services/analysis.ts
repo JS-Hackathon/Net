@@ -5,7 +5,7 @@ export interface ResumeAnalysis {
   resumeId: string;
   status: string;
   confidenceScore: number | null;
-  parsedData: any | null;
+  parsedData: Record<string, unknown> | null;
   errorMessage: string | null;
   parsingDuration: number | null;
   createdAt: string;
@@ -19,11 +19,23 @@ export interface ParsingStatus {
   currentStep: string | null;
 }
 
-const mapAnalysis = (a: any): ResumeAnalysis => ({
+interface RawAnalysis {
+  id: string;
+  resume_id: string;
+  status: string;
+  confidence_score: string | number | null;
+  parsed_data: Record<string, unknown> | null;
+  error_message: string | null;
+  parsing_duration: number | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+const mapAnalysis = (a: RawAnalysis): ResumeAnalysis => ({
   id: a.id,
   resumeId: a.resume_id,
   status: a.status,
-  confidenceScore: a.confidence_score !== null ? parseFloat(a.confidence_score) : null,
+  confidenceScore: a.confidence_score !== null ? parseFloat(String(a.confidence_score)) : null,
   parsedData: a.parsed_data,
   errorMessage: a.error_message,
   parsingDuration: a.parsing_duration,
@@ -53,7 +65,7 @@ export const analysisService = {
     };
   },
 
-  async submitAnalysisReview(analysisId: string, corrections: any, approved: boolean): Promise<ResumeAnalysis> {
+  async submitAnalysisReview(analysisId: string, corrections: Record<string, unknown>, approved: boolean): Promise<ResumeAnalysis> {
     const response = await api.put(`/api/v1/analyses/${analysisId}/review`, {
       corrections,
       approved,

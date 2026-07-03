@@ -13,7 +13,20 @@ export interface Resume {
   updatedAt: string;
 }
 
-const mapResume = (r: any): Resume => ({
+interface RawResume {
+  id: string;
+  filename: string;
+  original_filename: string;
+  file_size: number;
+  file_type: string;
+  upload_status: string;
+  is_primary: boolean;
+  text_extraction_status: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const mapResume = (r: RawResume): Resume => ({
   id: r.id,
   filename: r.filename,
   originalFilename: r.original_filename,

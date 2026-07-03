@@ -15,12 +15,12 @@ function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValidToken, setIsValidToken] = useState(true);
+  
+  const isValidToken = !!token;
 
   useEffect(() => {
     if (!token) {
       toast.error("Thiếu mã xác thực khôi phục mật khẩu. Vui lòng kiểm tra lại liên kết.");
-      setIsValidToken(false);
     }
   }, [token]);
 
@@ -66,8 +66,9 @@ function ResetPasswordForm() {
       });
       // Điều hướng về login cùng với thông báo thành công
       router.push("/login?message=Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Mã khôi phục mật khẩu không hợp lệ hoặc đã hết hạn.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Mã khôi phục mật khẩu không hợp lệ hoặc đã hết hạn.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);

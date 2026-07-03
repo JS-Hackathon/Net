@@ -16,7 +16,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mockGoogleEmail, setMockGoogleEmail] = useState("");
-  const [showMockGoogle, setShowMockGoogle] = useState(false);
+  const [showMockGoogle] = useState(false);
 
   // Lấy thông điệp thông báo từ redirect nếu có (ví dụ: đổi mật khẩu thành công)
   useEffect(() => {
@@ -47,8 +47,9 @@ function LoginForm() {
       await login({ email, password });
       toast.success("Đăng nhập thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -61,8 +62,9 @@ function LoginForm() {
       await googleLogin({ googleToken: token });
       toast.success("Đăng nhập bằng Google thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Xác thực qua tài khoản Google thất bại";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Xác thực qua tài khoản Google thất bại";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);

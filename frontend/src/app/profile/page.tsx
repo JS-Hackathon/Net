@@ -66,7 +66,7 @@ export default function ProfilePage() {
   // Editing Profile Section States
   const [editingSection, setEditingSection] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editFormData, setEditFormData] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState<Record<string, unknown> | Record<string, unknown>[] | null>(null);
 
   // Ref for polling interval
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -249,6 +249,7 @@ export default function ProfilePage() {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Resumes list actions
@@ -257,7 +258,7 @@ export default function ProfilePage() {
       await resumeService.deleteResume(id);
       toast.success("Xóa CV thành công!");
       fetchCandidateData();
-    } catch (e) {
+    } catch (_e) {
       toast.error("Xóa CV thất bại");
     }
   };
@@ -267,7 +268,7 @@ export default function ProfilePage() {
       await resumeService.setPrimaryResume(id);
       toast.success("Đã thiết lập CV chính!");
       fetchCandidateData();
-    } catch (e) {
+    } catch (_e) {
       toast.error("Thiết lập CV chính thất bại");
     }
   };
@@ -276,7 +277,7 @@ export default function ProfilePage() {
     try {
       const url = await resumeService.getDownloadUrl(id);
       window.open(url, "_blank");
-    } catch (e) {
+    } catch (_e) {
       toast.error("Tải xuống CV thất bại");
     }
   };
@@ -287,13 +288,13 @@ export default function ProfilePage() {
       const analysis = await analysisService.parseResume(id);
       setActiveAnalysis(analysis);
       startPolling(analysis.id);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Phân tích CV thất bại");
     }
   };
 
   // Submit manual corrections & Sync
-  const handleApproveReview = async (corrections: Record<string, any>) => {
+  const handleApproveReview = async (corrections: Record<string, unknown>) => {
     if (!reviewAnalysis) return;
 
     try {
@@ -303,7 +304,7 @@ export default function ProfilePage() {
       setReviewAnalysis(null);
       fetchCandidateData();
       setActiveTab("profile"); // Switch to profile tab to inspect the completeness
-    } catch (e) {
+    } catch (_e) {
       toast.error("Đồng bộ và phê duyệt thất bại");
     }
   };
@@ -323,7 +324,7 @@ export default function ProfilePage() {
       document.body.removeChild(link);
       
       toast.success(`Xuất hồ sơ thành công! File đã được tải xuống.`);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Xuất hồ sơ năng lực thất bại");
     }
   };
@@ -334,7 +335,7 @@ export default function ProfilePage() {
     setEditingSection(section);
     
     // Copy the specific data to form state
-    let data: any = {};
+    let data: Record<string, unknown> | Record<string, unknown>[] = {};
     if (section === "personal_info") {
       data = {
         full_name: profile.fullName,
@@ -358,7 +359,7 @@ export default function ProfilePage() {
         availability: profile.availability
       };
     } else {
-      data = (profile as any)[
+      data = (profile as Record<string, unknown>)[
         section === "work_experience" ? "workExperience" :
         section === "education" ? "education" :
         section === "technical_skills" ? "technicalSkills" :
@@ -378,7 +379,7 @@ export default function ProfilePage() {
       let payload = editFormData;
       if (editingSection === "work_experience") {
         payload = {
-          work_experience: editFormData.map((w: any) => ({
+          work_experience: editFormData.map((w: Record<string, unknown>) => ({
             title: w.title,
             company: w.company,
             location: w.location,
@@ -392,7 +393,7 @@ export default function ProfilePage() {
         };
       } else if (editingSection === "education") {
         payload = {
-          education: editFormData.map((e: any) => ({
+          education: editFormData.map((e: Record<string, unknown>) => ({
             degree: e.degree,
             field_of_study: e.fieldOfStudy,
             institution: e.institution,
@@ -404,7 +405,7 @@ export default function ProfilePage() {
         };
       } else if (editingSection === "technical_skills") {
         payload = {
-          technical_skills: editFormData.map((s: any) => ({
+          technical_skills: editFormData.map((s: Record<string, unknown>) => ({
             name: s.name,
             category: s.category,
             proficiency: s.proficiency,
@@ -413,14 +414,14 @@ export default function ProfilePage() {
         };
       } else if (editingSection === "soft_skills") {
         payload = {
-          soft_skills: editFormData.map((s: any) => ({
+          soft_skills: editFormData.map((s: Record<string, unknown>) => ({
             name: s.name,
             description: s.description
           }))
         };
       } else if (editingSection === "certifications") {
         payload = {
-          certifications: editFormData.map((c: any) => ({
+          certifications: editFormData.map((c: Record<string, unknown>) => ({
             name: c.name,
             issuer: c.issuer,
             issue_date: c.issueDate,
@@ -431,7 +432,7 @@ export default function ProfilePage() {
         };
       } else if (editingSection === "projects") {
         payload = {
-          projects: editFormData.map((proj: any) => ({
+          projects: editFormData.map((proj: Record<string, unknown>) => ({
             name: proj.name,
             description: proj.description,
             technologies: proj.technologies,
@@ -442,7 +443,7 @@ export default function ProfilePage() {
         };
       } else if (editingSection === "achievements") {
         payload = {
-          achievements: editFormData.map((ac: any) => ({
+          achievements: editFormData.map((ac: Record<string, unknown>) => ({
             title: ac.title,
             description: ac.description,
             date: ac.date,
@@ -456,7 +457,7 @@ export default function ProfilePage() {
       setEditingSection(null);
       setEditFormData(null);
       fetchCandidateData();
-    } catch (e: any) {
+    } catch (_e: unknown) {
       toast.error(e.response?.data?.message || "Cập nhật thất bại");
     }
   };
@@ -1017,8 +1018,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Họ và tên</label>
                       <input
                         type="text"
-                        value={(editFormData as any).full_name || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), full_name: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).full_name || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), full_name: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1026,8 +1027,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Email liên hệ</label>
                       <input
                         type="email"
-                        value={(editFormData as any).email || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), email: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).email || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), email: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1035,8 +1036,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Số điện thoại</label>
                       <input
                         type="text"
-                        value={(editFormData as any).phone || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), phone: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).phone || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), phone: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1044,8 +1045,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Địa chỉ sinh sống</label>
                       <input
                         type="text"
-                        value={(editFormData as any).location || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), location: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).location || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), location: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1058,8 +1059,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Tóm tắt tiểu sử chuyên môn</label>
                       <textarea
                         rows={4}
-                        value={(editFormData as any).professional_summary || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), professional_summary: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).professional_summary || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), professional_summary: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1067,8 +1068,8 @@ export default function ProfilePage() {
                       <label className="text-xs font-semibold">Mục tiêu nghề nghiệp</label>
                       <textarea
                         rows={3}
-                        value={(editFormData as any).career_objective || ""}
-                        onChange={e => setEditFormData({ ...(editFormData as any), career_objective: e.target.value })}
+                        value={(editFormData as Record<string, unknown>).career_objective || ""}
+                        onChange={e => setEditFormData({ ...(editFormData as Record<string, unknown>), career_objective: e.target.value })}
                         className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-955 text-sm"
                       />
                     </div>
@@ -1080,7 +1081,7 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <button
                       onClick={() => {
-                        const list = [...(editFormData as any[])];
+                        const list = [...(editFormData as Record<string, unknown>[])];
                         list.push({ title: "Chức danh", company: "Công ty", startDate: "2024", isCurrent: false, description: "Mô tả..." });
                         setEditFormData(list);
                       }}
@@ -1090,11 +1091,11 @@ export default function ProfilePage() {
                     </button>
 
                     <div className="space-y-4">
-                      {(editFormData as any[]).map((exp: any, idx: number) => (
+                      {(editFormData as Record<string, unknown>[]).map((exp: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 relative space-y-3">
                           <button
                             onClick={() => {
-                              const list = (editFormData as any[]).filter((_: any, i: number) => i !== idx);
+                              const list = (editFormData as Record<string, unknown>[]).filter((_: unknown, i: number) => i !== idx);
                               setEditFormData(list);
                             }}
                             className="absolute top-4 right-4 h-8 w-8 text-zinc-400 hover:text-red-500 flex items-center justify-center"
@@ -1109,7 +1110,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={exp.title || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].title = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1122,7 +1123,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={exp.company || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].company = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1135,7 +1136,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={exp.startDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].startDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1148,7 +1149,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={exp.endDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].endDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1161,7 +1162,7 @@ export default function ProfilePage() {
                                 rows={3}
                                 value={exp.description || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].description = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1180,7 +1181,7 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <button
                       onClick={() => {
-                        const list = [...(editFormData as any[])];
+                        const list = [...(editFormData as Record<string, unknown>[])];
                         list.push({ degree: "Bằng cấp", institution: "Trường", graduationDate: "2026", honors: [] });
                         setEditFormData(list);
                       }}
@@ -1190,11 +1191,11 @@ export default function ProfilePage() {
                     </button>
 
                     <div className="space-y-4">
-                      {(editFormData as any[]).map((edu: any, idx: number) => (
+                      {(editFormData as Record<string, unknown>[]).map((edu: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 relative space-y-3">
                           <button
                             onClick={() => {
-                              const list = (editFormData as any[]).filter((_: any, i: number) => i !== idx);
+                              const list = (editFormData as Record<string, unknown>[]).filter((_: unknown, i: number) => i !== idx);
                               setEditFormData(list);
                             }}
                             className="absolute top-4 right-4 h-8 w-8 text-zinc-400 hover:text-red-500 flex items-center justify-center"
@@ -1209,7 +1210,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={edu.degree || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].degree = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1222,7 +1223,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={edu.institution || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].institution = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1235,7 +1236,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={edu.graduationDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].graduationDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1254,7 +1255,7 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <button
                       onClick={() => {
-                        const list = [...(editFormData as any[])];
+                        const list = [...(editFormData as Record<string, unknown>[])];
                         list.push({ name: "Kỹ năng", category: "Chung", proficiency: "Intermediate" });
                         setEditFormData(list);
                       }}
@@ -1264,13 +1265,13 @@ export default function ProfilePage() {
                     </button>
 
                     <div className="grid md:grid-cols-2 gap-4">
-                      {(editFormData as any[]).map((skill: any, idx: number) => (
+                      {(editFormData as Record<string, unknown>[]).map((skill: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/20 dark:bg-zinc-900/30 flex items-center gap-2">
                           <input
                             type="text"
                             value={skill.name || ""}
                             onChange={e => {
-                              const list = [...(editFormData as any[])];
+                              const list = [...(editFormData as Record<string, unknown>[])];
                               list[idx].name = e.target.value;
                               setEditFormData(list);
                             }}
@@ -1280,7 +1281,7 @@ export default function ProfilePage() {
                           <select
                             value={skill.proficiency || "Intermediate"}
                             onChange={e => {
-                              const list = [...(editFormData as any[])];
+                              const list = [...(editFormData as Record<string, unknown>[])];
                               list[idx].proficiency = e.target.value;
                               setEditFormData(list);
                             }}
@@ -1293,7 +1294,7 @@ export default function ProfilePage() {
                           </select>
                           <button
                             onClick={() => {
-                              const list = (editFormData as any[]).filter((_: any, i: number) => i !== idx);
+                              const list = (editFormData as Record<string, unknown>[]).filter((_: unknown, i: number) => i !== idx);
                               setEditFormData(list);
                             }}
                             className="h-8 w-8 text-zinc-400 hover:text-red-500 flex items-center justify-center shrink-0"
@@ -1311,7 +1312,7 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <button
                       onClick={() => {
-                        const list = [...(editFormData as any[])];
+                        const list = [...(editFormData as Record<string, unknown>[])];
                         list.push({ name: "Chứng chỉ mới", issuer: "Tổ chức cấp", issueDate: "2024", expiryDate: "", credentialId: "", verificationUrl: "" });
                         setEditFormData(list);
                       }}
@@ -1321,11 +1322,11 @@ export default function ProfilePage() {
                     </button>
 
                     <div className="space-y-4">
-                      {(editFormData as any[]).map((c: any, idx: number) => (
+                      {(editFormData as Record<string, unknown>[]).map((c: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 relative space-y-3">
                           <button
                             onClick={() => {
-                              const list = (editFormData as any[]).filter((_: any, i: number) => i !== idx);
+                              const list = (editFormData as Record<string, unknown>[]).filter((_: unknown, i: number) => i !== idx);
                               setEditFormData(list);
                             }}
                             className="absolute top-4 right-4 h-8 w-8 text-zinc-400 hover:text-red-500 flex items-center justify-center cursor-pointer"
@@ -1340,7 +1341,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={c.name || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].name = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1353,7 +1354,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={c.issuer || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].issuer = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1366,7 +1367,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={c.issueDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].issueDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1379,7 +1380,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={c.verificationUrl || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].verificationUrl = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1398,7 +1399,7 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <button
                       onClick={() => {
-                        const list = [...(editFormData as any[])];
+                        const list = [...(editFormData as Record<string, unknown>[])];
                         list.push({ name: "Dự án mới", description: "Mô tả dự án...", technologies: [], url: "", startDate: "2024", endDate: "" });
                         setEditFormData(list);
                       }}
@@ -1408,11 +1409,11 @@ export default function ProfilePage() {
                     </button>
 
                     <div className="space-y-4">
-                      {(editFormData as any[]).map((proj: any, idx: number) => (
+                      {(editFormData as Record<string, unknown>[]).map((proj: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 relative space-y-3">
                           <button
                             onClick={() => {
-                              const list = (editFormData as any[]).filter((_: any, i: number) => i !== idx);
+                              const list = (editFormData as Record<string, unknown>[]).filter((_: unknown, i: number) => i !== idx);
                               setEditFormData(list);
                             }}
                             className="absolute top-4 right-4 h-8 w-8 text-zinc-400 hover:text-red-500 flex items-center justify-center cursor-pointer"
@@ -1427,7 +1428,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={proj.name || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].name = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1440,7 +1441,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={proj.url || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].url = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1453,7 +1454,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={proj.startDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].startDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1466,7 +1467,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={proj.endDate || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].endDate = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1479,7 +1480,7 @@ export default function ProfilePage() {
                                 rows={3}
                                 value={proj.description || ""}
                                 onChange={e => {
-                                  const list = [...(editFormData as any[])];
+                                  const list = [...(editFormData as Record<string, unknown>[])];
                                   list[idx].description = e.target.value;
                                   setEditFormData(list);
                                 }}
@@ -1523,7 +1524,3 @@ export default function ProfilePage() {
 }
 
 // Simple internal logger helper to bypass global linter issues
-const logger = {
-  info: (...args: any[]) => console.log("[INFO]", ...args),
-  error: (...args: any[]) => console.error("[ERROR]", ...args),
-};
