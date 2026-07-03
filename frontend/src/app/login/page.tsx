@@ -24,6 +24,15 @@ function LoginForm() {
     if (message) {
       toast.success(message);
     }
+    // Hiển thị lý do khi bị đưa về trang đăng nhập (OAuth lỗi, phiên hết hạn...)
+    const error = searchParams.get("error");
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        google_auth_failed: "Đăng nhập bằng Google thất bại. Vui lòng thử lại.",
+        session_setup_failed: "Không thiết lập được phiên đăng nhập. Vui lòng thử lại.",
+      };
+      toast.error(errorMessages[error] || "Đăng nhập thất bại. Vui lòng thử lại.");
+    }
     // Check auth status on mount
     checkAuth();
   }, [searchParams, checkAuth]);

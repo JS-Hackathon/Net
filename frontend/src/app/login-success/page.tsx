@@ -24,9 +24,12 @@ function LoginSuccessContent() {
       // Lưu token vào localStorage qua Zustand action
       setTokens(accessToken, refreshToken);
 
-      // Gọi checkAuth để fetch thông tin user profile
-      checkAuth(true).then(() => {
-        router.push("/");
+      // Nạp hồ sơ, rồi chỉ điều hướng khi phiên vẫn còn hiệu lực. Nếu token bị
+      // thu hồi (đăng nhập thật sự thất bại) mới đưa về /login kèm mã lỗi —
+      // tránh việc lỗi mạng/CORS tạm thời đá người dùng ra khỏi phiên.
+      checkAuth(true).finally(() => {
+        const hasSession = !!useAuthStore.getState().accessToken;
+        router.push(hasSession ? "/" : "/login?error=session_setup_failed");
       });
     } else {
       router.push("/login");
