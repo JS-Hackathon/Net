@@ -11,7 +11,16 @@ class JSearchServiceImpl(JSearchService):
         self.api_key = settings.JSEARCH_API_KEY
         self.url = "https://jsearch.p.rapidapi.com/search-v2"
 
-    async def search_jobs(self, query: str, page: int = 1) -> List[Dict[str, Any]]:
+    async def search_jobs(
+        self,
+        query: str,
+        page: int = 1,
+        *,
+        country: str | None = None,
+        date_posted: str | None = None,
+        remote_only: bool = False,
+        employment_types: str | None = None,
+    ) -> List[Dict[str, Any]]:
         if not self.api_key:
             logger.warning("JSEARCH_API_KEY not configured. Returning Mock job search results.")
             return self._mock_jobs()
@@ -20,11 +29,24 @@ class JSearchServiceImpl(JSearchService):
             "x-rapidapi-key": self.api_key,
             "x-rapidapi-host": "jsearch.p.rapidapi.com"
         }
+        # Filter server-side (previously these were configured but never sent).
+        # Only send country when set — JSearch has sparse VN coverage, so an empty
+        # country returns real (global) jobs instead of nothing.
         params = {
             "query": query,
             "page": str(page),
-            "num_pages": "1"
+            "num_pages": "1",
         }
+        _country = (country or settings.JSEARCH_COUNTRY or "").strip()
+        if _country:
+            params["country"] = _country
+        _date = (date_posted or settings.JSEARCH_DATE_POSTED or "").strip()
+        if _date and _date != "all":  # "all" is JSearch's default; omit it
+            params["date_posted"] = _date
+        if remote_only:
+            params["work_from_home"] = "true"
+        if employment_types:
+            params["employment_types"] = employment_types
 
         async with httpx.AsyncClient() as client:
             try:
@@ -32,14 +54,39 @@ class JSearchServiceImpl(JSearchService):
                     self.url,
                     headers=headers,
                     params=params,
-                    timeout=10.0
+                    timeout=15.0  # free-tier JSearch can be slow
                 )
                 response.raise_for_status()
                 res_data = response.json()
-                return res_data.get("data", [])
+                jobs = self._as_job_list(res_data.get("data"))
+                if not jobs:
+                    # Odd shape (throttle/error object) — log keys (not body) to debug.
+                    logger.warning(
+                        f"JSearch returned no usable jobs (top keys={list(res_data.keys())}); "
+                        "falling back to mock/empty."
+                    )
+                return jobs
             except Exception as e:
-                logger.error(f"JSearch API search_jobs error: {e}. Falling back to mock results.")
+                logger.error(f"JSearch API search_jobs error: {type(e).__name__}. Falling back to mock/empty.")
                 return []
+
+    @staticmethod
+    def _as_job_list(data: Any) -> List[Dict[str, Any]]:
+        """Normalize the JSearch `data` field to a list of job dicts.
+
+        Robust to response-shape variance: `data` may be a list, a dict wrapping
+        a list (jobs/results/data), or a single job object. Anything else -> [].
+        """
+        if isinstance(data, list):
+            return [j for j in data if isinstance(j, dict)]
+        if isinstance(data, dict):
+            for key in ("jobs", "results", "data"):
+                inner = data.get(key)
+                if isinstance(inner, list):
+                    return [j for j in inner if isinstance(j, dict)]
+            if data.get("job_id") or data.get("job_title"):
+                return [data]
+        return []
 
     @staticmethod
     def _mock_jobs() -> List[Dict[str, Any]]:

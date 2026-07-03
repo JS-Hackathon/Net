@@ -30,8 +30,10 @@ class Settings(BaseSettings):
     # daily quota, enough for structured extraction/OCR of a resume.
     GEMINI_PARSE_MODEL: str = Field(default="gemini-2.5-flash-lite")
     JSEARCH_API_KEY: str = Field(default="")
-    # JSearch /search-v2 requires a country code + date_posted filter.
-    JSEARCH_COUNTRY: str = Field(default="vn")
+    # JSearch geographic filter. NOTE: JSearch has very sparse Vietnam coverage —
+    # country="vn" returns ~0 results, so default to empty (global) to return real
+    # jobs. Set explicitly only if you accept few/no results for that country.
+    JSEARCH_COUNTRY: str = Field(default="")
     JSEARCH_DATE_POSTED: str = Field(default="all")
     
     # Google OAuth2 Configuration

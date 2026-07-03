@@ -55,7 +55,12 @@ class JobDiscoveryServiceImpl(IJobDiscoveryService):
         )
 
         if total == 0 and page == 1:
-            await self._refresh_from_jsearch(query=query, location=location, page=page)
+            # The app's employment_type "remote" is a work-arrangement flag, so
+            # fold it into remote_only for the JSearch work_from_home filter.
+            remote = remote_only or (employment_type == "remote")
+            await self._refresh_from_jsearch(
+                query=query, location=location, page=page, remote_only=remote
+            )
             cached_jobs, total = await self.repo.search(
                 query=query,
                 location=location,
@@ -83,7 +88,9 @@ class JobDiscoveryServiceImpl(IJobDiscoveryService):
             },
         }
 
-    async def _refresh_from_jsearch(self, query: str, page: int, location: Optional[str] = None) -> None:
+    async def _refresh_from_jsearch(
+        self, query: str, page: int, location: Optional[str] = None, remote_only: bool = False
+    ) -> None:
         """Fetch jobs from JSearch and upsert them into the cache.
         
         If JSearch is unavailable (rate-limited, auth error, timeout) we fall
@@ -94,7 +101,9 @@ class JobDiscoveryServiceImpl(IJobDiscoveryService):
             # Region is handled by the `country` param (settings.JSEARCH_COUNTRY),
             # so only append a location when the user actually provided one.
             full_query = f"{query} in {location}" if location else query
-            raw_jobs = await self.jsearch.search_jobs(query=full_query, page=page)
+            raw_jobs = await self.jsearch.search_jobs(
+                query=full_query, page=page, remote_only=remote_only
+            )
             logger.info(f"JSearch returned {len(raw_jobs)} jobs for query '{full_query}'")
         except Exception as e:  # noqa: BLE001 - normalize any client error
             logger.warning(f"JSearch fetch failed ({e}); seeding mock data as fallback.")
