@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { Loader2 } from "lucide-react";
 
-export default function LoginSuccessPage() {
+function LoginSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setTokens, checkAuth } = useAuthStore();
@@ -45,5 +45,17 @@ export default function LoginSuccessPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+      </div>
+    }>
+      <LoginSuccessContent />
+    </Suspense>
   );
 }
