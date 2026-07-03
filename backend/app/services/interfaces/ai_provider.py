@@ -1,14 +1,17 @@
 from typing import Protocol, Dict, Any
 
 class AIProvider(Protocol):
-    async def parse_resume(self, text: str) -> Dict[str, Any]:
-        """Parse resume text into a structured candidate profile JSON.
+    async def parse_resume(self, text: str, pdf_bytes: bytes | None = None) -> Dict[str, Any]:
+        """Parse a resume into a structured candidate profile JSON.
 
         Args:
-            text (str): Raw text extracted from the resume.
+            text (str): Raw text extracted from the resume (normal path).
+            pdf_bytes (bytes | None): Raw PDF bytes for the multimodal/OCR path,
+                used when text extraction yields nothing (scanned/image CV).
 
         Returns:
-            Dict[str, Any]: Structured candidate profile containing skills, experience, education, etc.
+            Dict[str, Any]: Structured candidate profile (personal_info, work
+                experience, education, skills, etc.).
         """
         ...
     
