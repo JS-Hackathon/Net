@@ -193,7 +193,10 @@ function LoginForm() {
             {/* Google OAuth Button */}
             <button
               type="button"
-              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/google/login"}
+              onClick={() => {
+                const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/v1\/?$/, "").replace(/\/api\/?$/, "");
+                window.location.href = `${baseUrl}/api/v1/auth/google/login`;
+              }}
               disabled={isLoading || isSubmitting}
               className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition duration-200"
             >
