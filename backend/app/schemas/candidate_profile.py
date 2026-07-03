@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import List, Dict, Any, Optional
 
 # --- Nested Profile Structures ---
@@ -44,19 +44,30 @@ class CertificationSchema(BaseModel):
     verification_url: Optional[str] = Field(default=None, description="Liên kết xác minh")
 
 class LanguageSchema(BaseModel):
-    language: str = Field(..., description="Ngôn ngữ")
-    proficiency: str = Field(..., description="Mức độ thông thạo (Basic, Conversational, Fluent, Native)")
+    language: Optional[str] = Field(default=None, description="Ngôn ngữ")
+    proficiency: Optional[str] = Field(default=None, description="Mức độ thông thạo (Basic, Conversational, Fluent, Native)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _tolerant(cls, v):
+        # Tolerate data stored by earlier parses: accept a bare string, or a
+        # dict that used `name` instead of `language`.
+        if isinstance(v, str):
+            return {"language": v, "proficiency": None}
+        if isinstance(v, dict) and not v.get("language") and v.get("name"):
+            return {**v, "language": v.get("name")}
+        return v
 
 class ProjectSchema(BaseModel):
     name: str = Field(..., description="Tên dự án")
-    description: str = Field(..., description="Mô tả chi tiết dự án")
+    description: Optional[str] = Field(default=None, description="Mô tả chi tiết dự án")
     technologies: List[str] = Field(default_factory=list, description="Công nghệ sử dụng trong dự án")
     url: Optional[str] = Field(default=None, description="Đường dẫn dự án")
     start_date: Optional[str] = Field(default=None, description="Ngày bắt đầu")
     end_date: Optional[str] = Field(default=None, description="Ngày kết thúc")
 
 class AchievementSchema(BaseModel):
-    title: str = Field(..., description="Tiêu đề giải thưởng/thành tựu")
+    title: Optional[str] = Field(default=None, description="Tiêu đề giải thưởng/thành tựu")
     description: Optional[str] = Field(default=None, description="Mô tả chi tiết")
     date: Optional[str] = Field(default=None, description="Ngày đạt được")
     issuer: Optional[str] = Field(default=None, description="Nơi cấp/tổ chức khen thưởng")

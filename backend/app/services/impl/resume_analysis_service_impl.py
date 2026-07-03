@@ -390,9 +390,45 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
                 })
         normalized["certifications"] = normalized_certs
 
-        normalized["languages"] = data.get("languages") or []
-        normalized["projects"] = data.get("projects") or []
-        normalized["achievements"] = data.get("achievements") or []
+        # 8. Languages -> {language, proficiency} (accepts str or {name|language})
+        normalized_langs = []
+        for lang in (data.get("languages") or []):
+            if isinstance(lang, str):
+                normalized_langs.append({"language": lang, "proficiency": None})
+            elif isinstance(lang, dict):
+                normalized_langs.append({
+                    "language": lang.get("language") or lang.get("name"),
+                    "proficiency": lang.get("proficiency"),
+                })
+        normalized["languages"] = normalized_langs
+
+        # 9. Projects
+        normalized_projects = []
+        for proj in (data.get("projects") or []):
+            if isinstance(proj, dict):
+                normalized_projects.append({
+                    "name": proj.get("name") or "Project",
+                    "description": proj.get("description"),
+                    "technologies": proj.get("technologies") or [],
+                    "url": proj.get("url"),
+                    "start_date": proj.get("start_date"),
+                    "end_date": proj.get("end_date"),
+                })
+        normalized["projects"] = normalized_projects
+
+        # 10. Achievements
+        normalized_ach = []
+        for ach in (data.get("achievements") or []):
+            if isinstance(ach, str):
+                normalized_ach.append({"title": ach, "description": None, "date": None, "issuer": None})
+            elif isinstance(ach, dict):
+                normalized_ach.append({
+                    "title": ach.get("title") or ach.get("name"),
+                    "description": ach.get("description"),
+                    "date": ach.get("date"),
+                    "issuer": ach.get("issuer"),
+                })
+        normalized["achievements"] = normalized_ach
 
         return normalized
 
@@ -513,6 +549,12 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
             profile.languages = parsed_data.get("languages")
             profile.projects = parsed_data.get("projects")
             profile.achievements = parsed_data.get("achievements")
+
+        # Recompute completeness so the % reflects the freshly parsed data right
+        # away. Previously the score stayed at 0 after parsing and only updated
+        # once the user made a manual edit (which triggers this same recompute).
+        from app.services.impl.candidate_profile_service_impl import CandidateProfileServiceImpl
+        await CandidateProfileServiceImpl(session)._update_profile_completeness(profile)
 
     @staticmethod
     def _to_int(value: Any) -> Any:

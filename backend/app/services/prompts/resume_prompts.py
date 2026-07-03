@@ -105,7 +105,7 @@ RESUME_SCHEMA = {
             "items": {
                 "type": "OBJECT",
                 "properties": {
-                    "name": {"type": "STRING", "nullable": True},
+                    "language": {"type": "STRING", "nullable": True},
                     "proficiency": {"type": "STRING", "nullable": True},
                 },
             },
@@ -150,6 +150,8 @@ _INSTRUCTION = (
     "- `years_of_experience` must be an INTEGER (total professional years, rounded).\n"
     "- Extract personal_info (name, email, phone, location, links) whenever present — "
     "this is the most important section.\n"
+    "- `languages` means SPOKEN/human languages (e.g. English, Vietnamese). Do NOT "
+    "put programming languages there — those belong in technical_skills.\n"
 )
 
 
