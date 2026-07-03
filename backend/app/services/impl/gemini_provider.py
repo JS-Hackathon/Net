@@ -18,8 +18,27 @@ logger = logging.getLogger(__name__)
 class GeminiProvider(AIProvider):
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
-        self.model = "gemini-2.5-flash"
-        self.url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        self.model = settings.GEMINI_MODEL              # matching
+        self.parse_model = settings.GEMINI_PARSE_MODEL  # CV parsing (lighter, separate quota)
+        self._base = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def _endpoint(self, model: str) -> str:
+        return f"{self._base}/{model}:generateContent"
+
+    def _headers(self) -> Dict[str, str]:
+        # Send the key in a header, never in the URL query string, so it can't
+        # leak into httpx error messages, logs, or stored error_message fields.
+        return {"Content-Type": "application/json", "x-goog-api-key": self.api_key}
+
+    @staticmethod
+    def _retry_after_seconds(response: httpx.Response, default: float) -> float:
+        ra = response.headers.get("Retry-After")
+        if ra:
+            try:
+                return float(ra)
+            except ValueError:
+                pass
+        return default
 
     async def parse_resume(self, text: str, pdf_bytes: bytes | None = None) -> Dict[str, Any]:
         """Parse a resume into the canonical structured schema.
@@ -34,8 +53,6 @@ class GeminiProvider(AIProvider):
         """
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
-
-        headers = {"Content-Type": "application/json"}
 
         if pdf_bytes is not None:
             parts = [
@@ -58,28 +75,42 @@ class GeminiProvider(AIProvider):
             },
         }
 
-        last_error: Exception | None = None
+        last_status: int | None = None
         for attempt in range(3):  # initial try + 2 retries
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
-                        f"{self.url}?key={self.api_key}",
-                        json=payload,
-                        headers=headers,
+                        self._endpoint(self.parse_model), json=payload, headers=self._headers(),
                         timeout=45.0,  # PDF/multimodal is heavier than text
                     )
-                    response.raise_for_status()
-                    res_data = response.json()
-                    content = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(self._strip_json_fences(content))
-            except Exception as e:  # noqa: BLE001 - normalize any client/parse error
-                last_error = e
-                logger.warning(f"Gemini parse_resume attempt {attempt + 1}/3 failed: {e}")
+                # Rate limit: back off (respecting Retry-After) rather than
+                # hammering — retrying immediately just burns more quota.
+                if response.status_code == 429:
+                    last_status = 429
+                    wait = self._retry_after_seconds(response, default=3.0 * (attempt + 1))
+                    logger.warning(f"Gemini parse_resume rate-limited (429); backoff {wait:.1f}s ({attempt + 1}/3)")
+                    if attempt < 2:
+                        await asyncio.sleep(wait)
+                    continue
+                response.raise_for_status()
+                res_data = response.json()
+                content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(self._strip_json_fences(content))
+            except httpx.HTTPStatusError as e:  # non-429 HTTP error
+                last_status = e.response.status_code
+                logger.warning(f"Gemini parse_resume attempt {attempt + 1}/3: HTTP {last_status}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+            except Exception as e:  # noqa: BLE001 - network / JSON / shape errors
+                # Log the type only — never the exception str (may embed the URL/key).
+                logger.warning(f"Gemini parse_resume attempt {attempt + 1}/3 failed: {type(e).__name__}")
                 if attempt < 2:
                     await asyncio.sleep(0.5 * (attempt + 1))
 
-        logger.error(f"Gemini API parse_resume error after retries: {last_error}", exc_info=True)
-        raise ValueError(f"Failed to parse resume with Gemini API: {last_error}")
+        if last_status == 429:
+            raise ValueError("Hệ thống AI đang quá tải (đã đạt giới hạn tần suất). Vui lòng thử lại sau ít phút.")
+        logger.error(f"Gemini parse_resume failed after retries (last HTTP status={last_status}).")
+        raise ValueError("Không phân tích được CV bằng AI. Vui lòng thử lại sau.")
 
     @staticmethod
     def _strip_json_fences(content: str) -> str:
@@ -110,7 +141,6 @@ class GeminiProvider(AIProvider):
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
 
-        headers = {"Content-Type": "application/json"}
         prompt = build_matching_prompt(profile, job)
         payload = {
             "contents": [{
@@ -130,9 +160,9 @@ class GeminiProvider(AIProvider):
             async with httpx.AsyncClient() as client:
                 try:
                     response = await client.post(
-                        f"{self.url}?key={self.api_key}",
+                        self._endpoint(self.model),
                         json=payload,
-                        headers=headers,
+                        headers=self._headers(),
                         timeout=20.0
                     )
                     response.raise_for_status()

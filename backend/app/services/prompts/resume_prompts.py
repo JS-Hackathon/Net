@@ -153,9 +153,15 @@ _INSTRUCTION = (
 )
 
 
+# Cap the extracted text sent to the model. A resume is short; this guards
+# against pathological inputs blowing up token usage (cost/quota) on free tier.
+MAX_RESUME_TEXT_CHARS = 18000
+
+
 def build_resume_text_prompt(resume_text: str) -> str:
     """Prompt for the text path (extracted plain text)."""
-    return f"{_INSTRUCTION}\nResume Text:\n{resume_text}"
+    text = (resume_text or "")[:MAX_RESUME_TEXT_CHARS]
+    return f"{_INSTRUCTION}\nResume Text:\n{text}"
 
 
 def build_resume_pdf_prompt() -> str:

@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     
     # External APIs
     GEMINI_API_KEY: str = Field(default="")
+    # Model for job matching (heavier, higher quality).
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash")
+    # Model for CV parsing — a lighter model with a separate, higher free-tier
+    # daily quota, enough for structured extraction/OCR of a resume.
+    GEMINI_PARSE_MODEL: str = Field(default="gemini-2.5-flash-lite")
     JSEARCH_API_KEY: str = Field(default="")
     # JSearch /search-v2 requires a country code + date_posted filter.
     JSEARCH_COUNTRY: str = Field(default="vn")
