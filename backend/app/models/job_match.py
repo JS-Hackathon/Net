@@ -49,6 +49,7 @@ class JobMatch(Base):
     )
 
     # Relationships
+    user = relationship("User", back_populates="job_matches")
     job = relationship("Job", back_populates="matches")
     skills_matches = relationship("SkillMatch", back_populates="job_match", cascade="all, delete-orphan")
     feedback = relationship("MatchQualityFeedback", back_populates="job_match", cascade="all, delete-orphan")

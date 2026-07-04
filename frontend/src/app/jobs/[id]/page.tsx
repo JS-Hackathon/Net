@@ -89,10 +89,6 @@ export default function JobDetailPage() {
     );
   }
 
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
@@ -179,10 +175,6 @@ export default function JobDetailPage() {
             )
         )}
       </main>
-    </div>
-  );
-}
-
     </div>
   );
 }
