@@ -124,6 +124,15 @@ export const jobService = {
     return mapJob(response.data.data);
   },
 
+  async uploadJd(file: File): Promise<JobDetail> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post("/api/v1/jobs/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return mapJob(response.data.data);
+  },
+
   async bookmark(jobId: string): Promise<void> {
     await api.post(`/api/v1/jobs/${jobId}/bookmark`);
   },

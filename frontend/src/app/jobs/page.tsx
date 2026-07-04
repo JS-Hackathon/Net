@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Loader2, Sparkles, Briefcase } from "lucide-react";
+import { Search, Loader2, Sparkles, Briefcase, Upload } from "lucide-react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { jobService, JobSummary, JobRecommendation, Pagination } from "@/lib/services/jobs";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -30,6 +30,8 @@ export default function JobsPage() {
   const [searched, setSearched] = useState(false);
   const [recommendations, setRecommendations] = useState<JobRecommendation[]>([]);
   const [recLoading, setRecLoading] = useState(false);
+  const [uploadingJd, setUploadingJd] = useState(false);
+  const jdInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -78,6 +80,22 @@ export default function JobsPage() {
       toast.error("Không tải được gợi ý việc làm");
     } finally {
       setRecLoading(false);
+    }
+  };
+
+  const handleJdUpload = async (file: File) => {
+    setUploadingJd(true);
+    try {
+      const job = await jobService.uploadJd(file);
+      toast.success(`Đã thêm tin tuyển dụng: ${job.title}`);
+      setJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
+      setSearched(true);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || "Tải JD lên thất bại. Vui lòng thử lại.");
+    } finally {
+      setUploadingJd(false);
+      if (jdInputRef.current) jdInputRef.current.value = "";
     }
   };
 
@@ -141,7 +159,29 @@ export default function JobsPage() {
               {recLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary" />}
               Gợi ý cho tôi
             </button>
+            <button
+              onClick={() => jdInputRef.current?.click()}
+              disabled={uploadingJd}
+              title="Tải file JD (PDF/DOCX) để thêm tin tuyển dụng"
+              className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl border border-zinc-200 dark:border-zinc-800 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-60 transition"
+            >
+              {uploadingJd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 text-primary" />}
+              Tải JD lên
+            </button>
+            <input
+              ref={jdInputRef}
+              type="file"
+              accept=".pdf,.docx"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleJdUpload(f);
+              }}
+            />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Không tìm thấy việc phù hợp? <span className="font-semibold text-primary">Tải JD lên</span> để AI thêm tin tuyển dụng vào danh sách tìm kiếm & Auto Match.
+          </p>
         </div>
 
         {/* Recommendations */}
