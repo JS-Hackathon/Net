@@ -269,10 +269,7 @@ class GeminiProvider(AIProvider):
     async def parse_job_description(self, text: str, pdf_bytes: bytes | None = None) -> Dict[str, Any]:
         """Parse an uploaded Job Description into a structured job (maps to the
         jobs table). Same shape/robustness as parse_resume: structured output,
-        text or multimodal PDF path, retries, 429-aware, key in header."""
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
-
+        text or multimodal PDF path, retries with key rotation."""
         if pdf_bytes is not None:
             parts = [
                 {"text": build_jd_pdf_prompt()},
@@ -292,20 +289,30 @@ class GeminiProvider(AIProvider):
             },
         }
 
+        max_attempts = max(3, self._rotator.total_keys if self._rotator else 3)
         last_status: int | None = None
-        for attempt in range(3):
+
+        for attempt in range(max_attempts):
+            api_key = self._get_api_key()
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
-                        self._endpoint(self.parse_model), json=payload,
-                        headers=self._headers(), timeout=45.0,
+                        self._endpoint(self.parse_model),
+                        json=payload,
+                        headers=self._headers(api_key),
+                        timeout=45.0,
                     )
                 if response.status_code == 429:
                     last_status = 429
-                    wait = self._retry_after_seconds(response, default=3.0 * (attempt + 1))
-                    logger.warning(f"Gemini parse_jd rate-limited (429); backoff {wait:.1f}s ({attempt + 1}/3)")
-                    if attempt < 2:
-                        await asyncio.sleep(wait)
+                    wait = self._retry_after_seconds(response, default=60.0)
+                    if self._rotator:
+                        self._rotator.mark_rate_limited(api_key, extra_seconds=wait)
+                    logger.warning(
+                        "Gemini parse_jd 429 on key …%s; rotated to next (%d/%d)",
+                        api_key[-4:], attempt + 1, max_attempts,
+                    )
+                    if self._rotator and self._rotator.available_count() == 0:
+                        await asyncio.sleep(min(wait, 5.0))
                     continue
                 response.raise_for_status()
                 res_data = response.json()
@@ -313,17 +320,94 @@ class GeminiProvider(AIProvider):
                 return json.loads(self._strip_json_fences(content))
             except httpx.HTTPStatusError as e:
                 last_status = e.response.status_code
-                logger.warning(f"Gemini parse_jd attempt {attempt + 1}/3: HTTP {last_status}")
-                if attempt < 2:
+                logger.warning(
+                    "Gemini parse_jd attempt %d/%d: HTTP %d (key …%s)",
+                    attempt + 1, max_attempts, last_status, api_key[-4:],
+                )
+                if attempt < max_attempts - 1:
                     await asyncio.sleep(0.5 * (attempt + 1))
             except Exception as e:  # noqa: BLE001
-                logger.warning(f"Gemini parse_jd attempt {attempt + 1}/3 failed: {type(e).__name__}")
-                if attempt < 2:
+                logger.warning(
+                    "Gemini parse_jd attempt %d/%d failed: %s (key …%s)",
+                    attempt + 1, max_attempts, type(e).__name__, api_key[-4:],
+                )
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+
+        if last_status == 429:
+            raise ValueError(
+                "Hệ thống AI đang quá tải (tất cả API key đều bị giới hạn). "
+                "Vui lòng thử lại sau ít phút."
+            )
+        logger.error(
+            "Gemini parse_jd failed after %d attempts (last HTTP status=%s).",
+            max_attempts, last_status,
+        )
+        raise ValueError("Không phân tích được mô tả công việc (JD). Vui lòng thử lại sau.")
+
+    async def generate_interview_scenario(
+        self, profile: Dict[str, Any], job: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate a tailored mock-interview scenario for a candidate + job.
+        Uses the lighter parse model with key rotation."""
+        payload = {
+            "contents": [{"parts": [{"text": build_interview_prompt(profile, job)}]}],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 4096,
+                "responseMimeType": "application/json",
+                "responseSchema": INTERVIEW_SCHEMA,
+            },
+        }
+
+        max_attempts = max(3, self._rotator.total_keys if self._rotator else 3)
+        last_status: int | None = None
+
+        for attempt in range(max_attempts):
+            api_key = self._get_api_key()
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self._endpoint(self.parse_model),
+                        json=payload,
+                        headers=self._headers(api_key),
+                        timeout=45.0,
+                    )
+                if response.status_code == 429:
+                    last_status = 429
+                    wait = self._retry_after_seconds(response, default=60.0)
+                    if self._rotator:
+                        self._rotator.mark_rate_limited(api_key, extra_seconds=wait)
+                    logger.warning(
+                        "Gemini interview 429 on key …%s; rotated (%d/%d)",
+                        api_key[-4:], attempt + 1, max_attempts,
+                    )
+                    if self._rotator and self._rotator.available_count() == 0:
+                        await asyncio.sleep(min(wait, 5.0))
+                    continue
+                response.raise_for_status()
+                res_data = response.json()
+                content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(self._strip_json_fences(content))
+            except httpx.HTTPStatusError as e:
+                last_status = e.response.status_code
+                logger.warning(
+                    "Gemini interview attempt %d/%d: HTTP %d (key …%s)",
+                    attempt + 1, max_attempts, last_status, api_key[-4:],
+                )
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "Gemini interview attempt %d/%d failed: %s (key …%s)",
+                    attempt + 1, max_attempts, type(e).__name__, api_key[-4:],
+                )
+                if attempt < max_attempts - 1:
                     await asyncio.sleep(0.5 * (attempt + 1))
 
         if last_status == 429:
             raise ValueError("Hệ thống AI đang quá tải. Vui lòng thử lại sau ít phút.")
-        raise ValueError("Không phân tích được mô tả công việc (JD). Vui lòng thử lại sau.")
+        raise ValueError("Không tạo được kịch bản phỏng vấn. Vui lòng thử lại sau.")
 
     @property
     def model_version(self) -> str:
