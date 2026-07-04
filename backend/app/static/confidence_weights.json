@@ -1,0 +1,7 @@
+{
+  "matching_method": 0.35,
+  "evidence_strength": 0.25,
+  "evidence_frequency": 0.15,
+  "semantic_similarity": 0.15,
+  "context_consistency": 0.10
+}

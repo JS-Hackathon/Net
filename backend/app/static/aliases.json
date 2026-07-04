@@ -1,0 +1,14 @@
+{
+  "js": "javascript",
+  "ts": "typescript",
+  "postgres": "postgresql",
+  "docker compose": "docker",
+  "k8s": "kubernetes",
+  "react.js": "reactjs",
+  "react": "reactjs",
+  "vue": "vuejs",
+  "node": "nodejs",
+  "express": "expressjs",
+  "aws": "amazon web services",
+  "gcp": "google cloud platform"
+}

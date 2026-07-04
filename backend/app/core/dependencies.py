@@ -23,6 +23,14 @@ from app.services.impl.resume_analysis_service_impl import ResumeAnalysisService
 from app.services.interfaces.candidate_profile_service import ICandidateProfileService
 from app.services.impl.candidate_profile_service_impl import CandidateProfileServiceImpl
 
+from app.services.interfaces.skill_normalizer_service import ISkillNormalizerService
+from app.services.impl.skill_normalizer_service_impl import SkillNormalizerServiceImpl
+from app.services.interfaces.confidence_engine_service import IConfidenceEngineService
+from app.services.impl.confidence_engine_service_impl import ConfidenceEngineServiceImpl
+from app.services.interfaces.job_matching_service import IJobMatchingService
+from app.services.impl.job_matching_service_impl import JobMatchingServiceImpl
+
+
 def get_ai_provider() -> AIProvider:
     return _ai_provider
 
@@ -52,6 +60,21 @@ def get_candidate_profile_service(
     db: AsyncSession = Depends(get_db)
 ) -> ICandidateProfileService:
     return CandidateProfileServiceImpl(db)
+
+def get_skill_normalizer_service(
+    db: AsyncSession = Depends(get_db)
+) -> ISkillNormalizerService:
+    return SkillNormalizerServiceImpl(db)
+
+def get_confidence_engine_service() -> IConfidenceEngineService:
+    return ConfidenceEngineServiceImpl()
+
+def get_job_matching_service(
+    skill_normalizer: ISkillNormalizerService = Depends(get_skill_normalizer_service),
+    confidence_engine: IConfidenceEngineService = Depends(get_confidence_engine_service)
+) -> IJobMatchingService:
+    return JobMatchingServiceImpl(skill_normalizer, confidence_engine)
+
 
 import uuid
 from fastapi import HTTPException, status
