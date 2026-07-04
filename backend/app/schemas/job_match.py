@@ -4,6 +4,53 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 
 
+# --- Auto Match (one-shot: suitable companies + interview scenario) ---
+
+class AutoMatchCompany(BaseModel):
+    job_id: str
+    title: Optional[str] = None
+    company: Optional[str] = None
+    location: Optional[str] = None
+    employment_type: Optional[str] = None
+    match_score: float = 0.0
+    reason: Optional[str] = None
+    skills_required: List[str] = Field(default_factory=list)
+
+
+class InterviewQuestion(BaseModel):
+    category: Optional[str] = None
+    question: Optional[str] = None
+    assesses: Optional[str] = None
+    answer_tip: Optional[str] = None
+
+
+class InterviewScenario(BaseModel):
+    opening: Optional[str] = None
+    focus_skills: List[str] = Field(default_factory=list)
+    gaps_to_prepare: List[str] = Field(default_factory=list)
+    questions: List[InterviewQuestion] = Field(default_factory=list)
+    preparation_tips: List[str] = Field(default_factory=list)
+    closing: Optional[str] = None
+
+
+class AutoMatchTarget(BaseModel):
+    job_id: str
+    title: Optional[str] = None
+    company: Optional[str] = None
+    location: Optional[str] = None
+
+
+class AutoMatchData(BaseModel):
+    companies: List[AutoMatchCompany] = Field(default_factory=list)
+    target: AutoMatchTarget
+    interview_scenario: InterviewScenario
+
+
+class AutoMatchResponse(BaseModel):
+    success: bool = True
+    data: AutoMatchData
+
+
 class MatchScoreData(BaseModel):
     match_id: str
     overall_score: float

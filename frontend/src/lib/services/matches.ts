@@ -88,6 +88,39 @@ export interface BatchMatchResult {
   };
 }
 
+export interface AutoMatchCompany {
+  jobId: string;
+  title: string;
+  company: string;
+  location: string | null;
+  employmentType: string | null;
+  matchScore: number;
+  reason: string | null;
+  skillsRequired: string[];
+}
+
+export interface InterviewQuestion {
+  category: string | null;
+  question: string | null;
+  assesses: string | null;
+  answerTip: string | null;
+}
+
+export interface InterviewScenario {
+  opening: string | null;
+  focusSkills: string[];
+  gapsToPrepare: string[];
+  questions: InterviewQuestion[];
+  preparationTips: string[];
+  closing: string | null;
+}
+
+export interface AutoMatchResult {
+  companies: AutoMatchCompany[];
+  target: { jobId: string; title: string | null; company: string | null; location: string | null };
+  interviewScenario: InterviewScenario;
+}
+
 const num = (v: unknown): number | null => (v != null ? parseFloat(String(v)) : null);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,6 +147,44 @@ const mapJobBrief = (j: any): JobBrief => ({
 });
 
 export const matchService = {
+  async autoMatch(): Promise<AutoMatchResult> {
+    const response = await api.post("/api/v1/matches/auto");
+    const d = response.data.data;
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      companies: (d.companies || []).map((c: any) => ({
+        jobId: c.job_id,
+        title: c.title,
+        company: c.company,
+        location: c.location ?? null,
+        employmentType: c.employment_type ?? null,
+        matchScore: parseFloat(c.match_score ?? 0),
+        reason: c.reason ?? null,
+        skillsRequired: c.skills_required || [],
+      })),
+      target: {
+        jobId: d.target.job_id,
+        title: d.target.title ?? null,
+        company: d.target.company ?? null,
+        location: d.target.location ?? null,
+      },
+      interviewScenario: {
+        opening: d.interview_scenario.opening ?? null,
+        focusSkills: d.interview_scenario.focus_skills || [],
+        gapsToPrepare: d.interview_scenario.gaps_to_prepare || [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        questions: (d.interview_scenario.questions || []).map((q: any) => ({
+          category: q.category ?? null,
+          question: q.question ?? null,
+          assesses: q.assesses ?? null,
+          answerTip: q.answer_tip ?? null,
+        })),
+        preparationTips: d.interview_scenario.preparation_tips || [],
+        closing: d.interview_scenario.closing ?? null,
+      },
+    };
+  },
+
   async calculateMatch(jobId: string): Promise<MatchScore> {
     const response = await api.post(`/api/v1/jobs/${jobId}/match`);
     return mapScore(response.data.data);

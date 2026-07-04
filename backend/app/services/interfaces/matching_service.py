@@ -13,6 +13,11 @@ class IMatchingService:
         """Tính match cho nhiều job đồng thời (giới hạn concurrency), tối đa 50 job/lần."""
         ...
 
+    async def auto_match(self, user_id: uuid.UUID) -> Dict[str, Any]:
+        """Auto Match một chạm: xếp hạng công ty phù hợp (deterministic, không tốn
+        quota AI) + sinh kịch bản phỏng vấn cho công ty đứng đầu bằng 1 call AI."""
+        ...
+
     async def get_match_detail(self, user_id: uuid.UUID, match_id: uuid.UUID) -> Dict[str, Any]:
         """Lấy chi tiết một kết quả match kèm phân tích đầy đủ."""
         ...

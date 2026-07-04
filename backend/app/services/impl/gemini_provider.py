@@ -12,6 +12,7 @@ from app.services.prompts.resume_prompts import (
     build_resume_text_prompt,
     build_resume_pdf_prompt,
 )
+from app.services.prompts.interview_prompts import INTERVIEW_SCHEMA, build_interview_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -177,3 +178,57 @@ class GeminiProvider(AIProvider):
 
         logger.error(f"Gemini API match_job error after retries: {last_error}", exc_info=True)
         raise ValueError(f"Failed to match job with Gemini API: {str(last_error)}")
+
+    async def generate_interview_scenario(
+        self, profile: Dict[str, Any], job: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate a tailored mock-interview scenario for a candidate + job.
+
+        Uses the lighter parse model (flash-lite) so the Auto Match feature stays
+        within the free-tier quota. Retries and handles 429 like parse_resume.
+        """
+        if not self.api_key:
+            raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
+
+        payload = {
+            "contents": [{"parts": [{"text": build_interview_prompt(profile, job)}]}],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 4096,
+                "responseMimeType": "application/json",
+                "responseSchema": INTERVIEW_SCHEMA,
+            },
+        }
+
+        last_status: int | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self._endpoint(self.parse_model), json=payload,
+                        headers=self._headers(), timeout=45.0,
+                    )
+                if response.status_code == 429:
+                    last_status = 429
+                    wait = self._retry_after_seconds(response, default=3.0 * (attempt + 1))
+                    logger.warning(f"Gemini interview scenario rate-limited (429); backoff {wait:.1f}s ({attempt + 1}/3)")
+                    if attempt < 2:
+                        await asyncio.sleep(wait)
+                    continue
+                response.raise_for_status()
+                res_data = response.json()
+                content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(self._strip_json_fences(content))
+            except httpx.HTTPStatusError as e:
+                last_status = e.response.status_code
+                logger.warning(f"Gemini interview scenario attempt {attempt + 1}/3: HTTP {last_status}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Gemini interview scenario attempt {attempt + 1}/3 failed: {type(e).__name__}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+
+        if last_status == 429:
+            raise ValueError("Hệ thống AI đang quá tải. Vui lòng thử lại sau ít phút.")
+        raise ValueError("Không tạo được kịch bản phỏng vấn. Vui lòng thử lại sau.")

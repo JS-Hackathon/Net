@@ -26,3 +26,14 @@ class AIProvider(Protocol):
             Dict[str, Any]: Match result with score, strengths, weaknesses, etc.
         """
         ...
+
+    async def generate_interview_scenario(
+        self, profile: Dict[str, Any], job: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate a tailored mock-interview scenario for a candidate + job.
+
+        Returns:
+            Dict[str, Any]: { opening, focus_skills, gaps_to_prepare, questions[],
+                preparation_tips[], closing }.
+        """
+        ...

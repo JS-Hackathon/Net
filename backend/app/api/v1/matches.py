@@ -11,6 +11,7 @@ from app.schemas.job_match import (
     MatchListResponse, MatchListData,
     BatchMatchRequest, BatchMatchResponse, BatchMatchData,
     MatchFeedbackRequest, SimpleMessageResponse, SimpleMessageData,
+    AutoMatchResponse, AutoMatchData,
 )
 from app.services.interfaces.matching_service import IMatchingService
 
@@ -35,6 +36,23 @@ async def calculate_match(
     result = await service.calculate_match(user_id=current_user.id, job_id=uuid.UUID(job_id))
     await db.commit()
     return MatchScoreResponse(success=True, data=MatchScoreData(**result))
+
+
+@router.post(
+    "/matches/auto",
+    response_model=AutoMatchResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Auto Match — công ty phù hợp + kịch bản phỏng vấn",
+    description="Một chạm: xếp hạng công ty phù hợp theo hồ sơ và sinh kịch bản phỏng vấn cho công ty đứng đầu.",
+)
+async def auto_match(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IMatchingService = Depends(get_matching_service),
+) -> AutoMatchResponse:
+    result = await service.auto_match(user_id=current_user.id)
+    await db.commit()
+    return AutoMatchResponse(success=True, data=AutoMatchData(**result))
 
 
 @router.post(

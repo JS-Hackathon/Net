@@ -138,6 +138,115 @@ class MatchingServiceImpl(IMatchingService):
             },
         }
 
+    # ------------------------------------------------------------ auto match
+    async def auto_match(self, user_id: uuid.UUID) -> Dict[str, Any]:
+        """One-shot Auto Match: deterministically rank suitable companies by skill
+        overlap (no AI/quota cost) and generate a tailored interview scenario for
+        the top company via a single AI call."""
+        profile = await self.profile_repo.get_by_user_id(user_id)
+        skills = self._profile_skill_set(profile)
+        if not skills:
+            raise ValidationError("Hãy hoàn thiện kỹ năng trong hồ sơ trước khi Auto Match.")
+
+        jobs, _ = await self.job_repo.search(page=1, per_page=100)
+        if not jobs:
+            raise ValidationError(
+                "Chưa có dữ liệu việc làm để so khớp. Hãy vào Tìm việc để tải tin tuyển dụng trước."
+            )
+
+        ranked = self._rank_jobs(skills, jobs)[:5]
+        top_job = ranked[0][0]
+        scenario = await self._interview_scenario(profile, top_job)
+
+        return {
+            "companies": [
+                {
+                    "job_id": str(j.id),
+                    "title": j.title,
+                    "company": j.company_name,
+                    "location": j.location,
+                    "employment_type": j.employment_type,
+                    "match_score": score,
+                    "reason": reason,
+                    "skills_required": j.skills_required or [],
+                }
+                for j, score, reason in ranked
+            ],
+            "target": {
+                "job_id": str(top_job.id),
+                "title": top_job.title,
+                "company": top_job.company_name,
+                "location": top_job.location,
+            },
+            "interview_scenario": scenario,
+        }
+
+    @staticmethod
+    def _profile_skill_set(profile) -> set:
+        if not profile or not profile.technical_skills:
+            return set()
+        out = set()
+        for s in profile.technical_skills:
+            name = s.get("name") if isinstance(s, dict) else s
+            if name:
+                out.add(str(name).lower().strip())
+        return out
+
+    @staticmethod
+    def _rank_jobs(profile_skills: set, jobs: List[Job]) -> List[tuple]:
+        scored: List[tuple] = []
+        for job in jobs:
+            job_skills = {str(s).lower().strip() for s in (job.skills_required or []) if s}
+            if job_skills:
+                overlap = profile_skills & job_skills
+                score = round(len(overlap) / len(job_skills) * 100.0, 1)
+                reason = (
+                    f"Khớp {len(overlap)}/{len(job_skills)} kỹ năng: " + ", ".join(sorted(overlap))
+                    if overlap else "Cùng lĩnh vực nhưng chưa trùng kỹ năng cụ thể"
+                )
+            else:
+                score, reason = 0.0, "Gợi ý theo tin tuyển dụng mới"
+            scored.append((job, score, reason))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored
+
+    async def _interview_scenario(self, profile: CandidateProfile, job: Job) -> Dict[str, Any]:
+        if not getattr(self.ai, "api_key", None):
+            logger.warning("No AI key; returning mock interview scenario.")
+            return self._mock_scenario(profile, job)
+        try:
+            return await self.ai.generate_interview_scenario(
+                self._profile_to_dict(profile), self._job_to_dict(job)
+            )
+        except Exception as e:  # noqa: BLE001 - keep the feature working on AI failure/quota
+            logger.warning(f"Interview scenario AI failed ({type(e).__name__}); using mock.")
+            return self._mock_scenario(profile, job)
+
+    @staticmethod
+    def _mock_scenario(profile: CandidateProfile, job: Job) -> Dict[str, Any]:
+        skills = [(s.get("name") if isinstance(s, dict) else s) for s in (profile.technical_skills or [])]
+        skills = [s for s in skills if s][:5]
+        return {
+            "opening": f"Chào bạn, đây là buổi phỏng vấn thử cho vị trí {job.title} tại {job.company_name}.",
+            "focus_skills": skills,
+            "gaps_to_prepare": [],
+            "questions": [
+                {"category": "behavioral", "question": "Hãy giới thiệu bản thân và kinh nghiệm nổi bật của bạn.",
+                 "assesses": "Khả năng trình bày, mức độ phù hợp", "answer_tip": "Tập trung vào thành tựu liên quan tới vị trí."},
+                {"category": "technical", "question": f"Bạn đã dùng {skills[0] if skills else 'công nghệ chính'} trong dự án nào? Thách thức lớn nhất là gì?",
+                 "assesses": "Chiều sâu kỹ thuật", "answer_tip": "Nêu bối cảnh, giải pháp và kết quả đo lường được."},
+                {"category": "role", "question": f"Vì sao bạn phù hợp với vị trí {job.title} tại {job.company_name}?",
+                 "assesses": "Động lực & mức độ tìm hiểu", "answer_tip": "Gắn kỹ năng của bạn với yêu cầu tin tuyển dụng."},
+                {"category": "culture", "question": "Bạn làm việc nhóm và xử lý bất đồng quan điểm thế nào?",
+                 "assesses": "Văn hoá & teamwork", "answer_tip": "Đưa ví dụ cụ thể, nhấn mạnh lắng nghe và giải pháp."},
+            ],
+            "preparation_tips": [
+                "Ôn lại các dự án dùng kỹ năng cốt lõi của vị trí.",
+                "Chuẩn bị câu chuyện theo cấu trúc STAR cho các câu behavioral.",
+            ],
+            "closing": "Chúc bạn tự tin và thành công trong buổi phỏng vấn!",
+        }
+
     # ------------------------------------------------------------ read
     async def get_match_detail(self, user_id: uuid.UUID, match_id: uuid.UUID) -> Dict[str, Any]:
         match = await self.repo.get_by_id(match_id)
