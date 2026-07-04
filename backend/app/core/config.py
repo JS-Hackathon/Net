@@ -1,6 +1,7 @@
 import os
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, computed_field
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MockAI Backend"
@@ -23,12 +24,33 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # External APIs
+    # Single key (backward-compatible)
     GEMINI_API_KEY: str = Field(default="")
+    # Multiple keys for rotation (comma-separated). Takes priority over GEMINI_API_KEY.
+    GEMINI_API_KEYS: str = Field(default="")
+    # Cooldown duration (seconds) when a key gets rate-limited (429).
+    GEMINI_KEY_COOLDOWN: int = Field(default=60)
     # Model for job matching (heavier, higher quality).
     GEMINI_MODEL: str = Field(default="gemini-2.5-flash")
     # Model for CV parsing — a lighter model with a separate, higher free-tier
     # daily quota, enough for structured extraction/OCR of a resume.
     GEMINI_PARSE_MODEL: str = Field(default="gemini-2.5-flash-lite")
+
+    @computed_field
+    @property
+    def gemini_api_keys_list(self) -> List[str]:
+        """Parse all available Gemini API keys into a list.
+        
+        Priority: GEMINI_API_KEYS (comma-separated) > GEMINI_API_KEY (single).
+        Both are merged and deduplicated.
+        """
+        keys: list[str] = []
+        if self.GEMINI_API_KEYS:
+            keys.extend(k.strip() for k in self.GEMINI_API_KEYS.split(",") if k.strip())
+        if self.GEMINI_API_KEY and self.GEMINI_API_KEY not in keys:
+            keys.append(self.GEMINI_API_KEY)
+        return keys
+
     JSEARCH_API_KEY: str = Field(default="")
     # JSearch geographic filter. NOTE: JSearch has very sparse Vietnam coverage —
     # country="vn" returns ~0 results, so default to empty (global) to return real

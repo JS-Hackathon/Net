@@ -29,9 +29,10 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 64)
     logger.info(f"MockAI backend starting — ENV={settings.ENV}")
     logger.info(f"CORS allowed origins: {origins}")
+    gemini_key_count = len(settings.gemini_api_keys_list)
     logger.info(
-        "Integrations configured — gemini=%s jsearch=%s google=%s r2=%s",
-        bool(settings.GEMINI_API_KEY), bool(settings.JSEARCH_API_KEY),
+        "Integrations configured — gemini=%d key(s) jsearch=%s google=%s r2=%s",
+        gemini_key_count, bool(settings.JSEARCH_API_KEY),
         bool(settings.GOOGLE_CLIENT_ID), bool(settings.R2_BUCKET_NAME),
     )
     if settings.ENV != "production":
@@ -132,8 +133,9 @@ async def health_check(
         logger.error(f"Health Check - DB Error: {e}")
         db_status = "error"
 
-    # Check Gemini API Key status
-    gemini_status = "ok" if ai.api_key else "mock_mode"
+    # Check Gemini API Key rotation status
+    rotator_info = ai.rotator_status()
+    gemini_status = "ok" if rotator_info["enabled"] else "mock_mode"
     
     # Check JSearch API Key status
     jsearch_status = "ok" if jsearch.api_key else "mock_mode"
@@ -146,7 +148,8 @@ async def health_check(
             "db": db_status,
             "gemini": gemini_status,
             "jsearch": jsearch_status
-        }
+        },
+        "gemini_rotator": rotator_info,
     }
 
 @app.get("/api/info", summary="System Information")
