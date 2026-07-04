@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Sparkles, Bookmark, User, LogOut } from "lucide-react";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { useAuthStore } from "@/lib/store/authStore";
 
 const LINKS = [
@@ -46,8 +47,7 @@ export const AppHeader: React.FC = () => {
         </Link>
 
         {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-J53S2RH952"></script>
-        <script async src="/gganalytic.js"></script>
+        <GoogleAnalytics gaId="G-J53S2RH952" />
 
         <div className="flex items-center gap-1">
           <nav className="flex items-center gap-1">
