@@ -10,6 +10,7 @@ from app.core.database import Base
 
 class JobMatch(Base):
     """AI-powered compatibility analysis between a candidate and a job."""
+
     __tablename__ = "job_matches"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -48,6 +49,7 @@ class JobMatch(Base):
     )
 
     # Relationships
+    user = relationship("User", back_populates="job_matches")
     job = relationship("Job", back_populates="matches")
     skills_matches = relationship("SkillMatch", back_populates="job_match", cascade="all, delete-orphan")
     feedback = relationship("MatchQualityFeedback", back_populates="job_match", cascade="all, delete-orphan")
@@ -98,3 +100,4 @@ class MatchQualityFeedback(Base):
     __table_args__ = (
         CheckConstraint("user_rating >= 1 AND user_rating <= 5", name="ck_match_feedback_rating"),
     )
+

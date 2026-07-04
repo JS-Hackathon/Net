@@ -1,7 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import urllib.parse
+
+logger = logging.getLogger(__name__)
+
 
 from app.core.database import get_db
 from app.core.dependencies import get_auth_service, get_current_user
@@ -124,10 +128,12 @@ async def google_callback(
         redirect_url = f"{settings.FRONTEND_URL}/login-success?access_token={data.access_token}&refresh_token={data.refresh_token}"
         return RedirectResponse(redirect_url)
     except Exception as e:
+        logger.exception("Google authentication callback failed:")
         await db.rollback()
         # Redirect về frontend kèm tham số lỗi (nếu cần)
         redirect_url = f"{settings.FRONTEND_URL}/login?error=google_auth_failed"
         return RedirectResponse(redirect_url)
+
 
 @router.post(
     "/refresh",

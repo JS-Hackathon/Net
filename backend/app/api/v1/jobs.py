@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, Query, status, UploadFile, File
+from fastapi import APIRouter, Depends, Query, status, UploadFile, File, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+import logging
+from typing import List, Dict, Any
+import json
+from pydantic import BaseModel, Field
+import httpx
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_job_discovery_service
+from app.core.dependencies import get_current_user, get_job_discovery_service, get_ai_provider
 from app.models.user import User
 from app.schemas.job import (
     JobSearchResponse, JobSearchResponseData,
@@ -15,12 +20,15 @@ from app.schemas.job import (
     RecommendationListResponse, RecommendationListData,
 )
 from app.services.interfaces.job_discovery_service import IJobDiscoveryService
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(
     prefix="/jobs",
     tags=["Job Discovery - Khám phá việc làm"]
 )
-
 
 @router.get(
     "/search",
@@ -208,3 +216,85 @@ async def unbookmark_job(
         success=True,
         data=BookmarkActionData(message="Đã bỏ lưu việc làm", is_bookmarked=False),
     )
+
+
+# --- Preserved: AI extract-requirements endpoint from feat-matching (kept) ---
+class ExtractRequest(BaseModel):
+    job_description: str = Field(..., description="Raw text of the job description.")
+
+@router.post(
+    "/extract-requirements",
+    response_model=List[Dict[str, Any]],
+    summary="Trích xuất yêu cầu công việc từ mô tả thô (JD)",
+    description="Sử dụng AI để phân tích mô tả công việc thô và trích xuất danh sách các yêu cầu kỹ thuật có cấu trúc."
+)
+async def extract_requirements(
+    payload: ExtractRequest,
+    current_user: User = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        # Fallback mocks
+        return [
+            {
+                "id": "REQ1",
+                "text": "Experience with Backend Development",
+                "canonical": "Backend Development",
+                "category": "Backend Development",
+                "section": "must_have",
+                "priority": "CRITICAL"
+            },
+            {
+                "id": "REQ2",
+                "text": "Knowledge of SQL Database",
+                "canonical": "SQL Database",
+                "category": "SQL Database",
+                "section": "required",
+                "priority": "HIGH"
+            }
+        ]
+
+    prompt = (
+        "You are an expert technical recruiter. Analyze the following job description text "
+        "and extract a list of structured requirements. "
+        "Return strictly a JSON array of objects. Do not include markdown formatting (like ```json) or any explanations.\n\n"
+        "Each object in the array must strictly have these fields:\n"
+        "- 'id': unique string identifier (e.g. 'REQ1', 'REQ2')\n"
+        "- 'text': raw requirement sentence from JD\n"
+        "- 'canonical': canonical technical concept (e.g. 'Backend Development', 'Containerization', 'SQL Database', 'Frontend Development')\n"
+        "- 'category': high-level category\n"
+        "- 'section': must be one of ['must_have', 'required', 'preferred', 'nice_to_have']\n"
+        "- 'priority': must be one of ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']\n\n"
+        f"Job Description:\n{payload.job_description}"
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, json=body, headers=headers, timeout=15.0)
+            response.raise_for_status()
+            res_data = response.json()
+            content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+            return json.loads(content)
+        except Exception as e:
+            logger.error(f"Failed to extract requirements via Gemini: {e}")
+            # Fallback mocks on error
+            return [
+                {
+                    "id": "REQ1",
+                    "text": "Experience with software engineering principles",
+                    "canonical": "Backend Development",
+                    "category": "Software",
+                    "section": "must_have",
+                    "priority": "CRITICAL"
+                }
+            ]
+

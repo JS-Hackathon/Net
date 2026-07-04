@@ -9,6 +9,8 @@ from app.models.resume_analysis import ResumeAnalysis, ParsingMetric, AIPrompt
 from app.models.candidate_profile import CandidateProfile, ProfileCompleteness, ProfileUpdate
 from app.models.job import Job, UserJobInteraction, SavedSearch, JobRecommendation
 from app.models.job_match import JobMatch, SkillMatch, MatchQualityFeedback
+from app.models.job_match import JobMatch
+from app.models.ai_skill_mapping import AISkillMapping
 
 __all__ = [
     "Base",
@@ -24,11 +26,18 @@ __all__ = [
     "CandidateProfile",
     "ProfileCompleteness",
     "ProfileUpdate",
+    "CandidateProfile",
+    "ProfileCompleteness",
+    "ProfileUpdate",
     "Job",
     "UserJobInteraction",
     "SavedSearch",
     "JobRecommendation",
     "JobMatch",
     "SkillMatch",
-    "MatchQualityFeedback"
+    "MatchQualityFeedback",
+    "AISkillMapping"
+
 ]
+
+

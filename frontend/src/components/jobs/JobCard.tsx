@@ -89,4 +89,5 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onBookmarkToggle }) => {
   );
 };
 
+
 export default JobCard;

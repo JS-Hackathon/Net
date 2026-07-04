@@ -30,3 +30,5 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
     profile = relationship("CandidateProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    job_matches = relationship("JobMatch", back_populates="user", cascade="all, delete-orphan")
+

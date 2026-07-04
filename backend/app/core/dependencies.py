@@ -27,6 +27,14 @@ from app.services.impl.job_discovery_service_impl import JobDiscoveryServiceImpl
 from app.services.interfaces.matching_service import IMatchingService
 from app.services.impl.matching_service_impl import MatchingServiceImpl
 
+from app.services.interfaces.skill_normalizer_service import ISkillNormalizerService
+from app.services.impl.skill_normalizer_service_impl import SkillNormalizerServiceImpl
+from app.services.interfaces.confidence_engine_service import IConfidenceEngineService
+from app.services.impl.confidence_engine_service_impl import ConfidenceEngineServiceImpl
+from app.services.interfaces.job_matching_service import IJobMatchingService
+from app.services.impl.job_matching_service_impl import JobMatchingServiceImpl
+
+
 def get_ai_provider() -> AIProvider:
     return _ai_provider
 
@@ -57,6 +65,21 @@ def get_candidate_profile_service(
 ) -> ICandidateProfileService:
     return CandidateProfileServiceImpl(db)
 
+def get_skill_normalizer_service(
+    db: AsyncSession = Depends(get_db)
+) -> ISkillNormalizerService:
+    return SkillNormalizerServiceImpl(db)
+
+def get_confidence_engine_service() -> IConfidenceEngineService:
+    return ConfidenceEngineServiceImpl()
+
+def get_job_matching_service(
+    skill_normalizer: ISkillNormalizerService = Depends(get_skill_normalizer_service),
+    confidence_engine: IConfidenceEngineService = Depends(get_confidence_engine_service)
+) -> IJobMatchingService:
+    return JobMatchingServiceImpl(skill_normalizer, confidence_engine)
+
+
 def get_job_discovery_service(
     db: AsyncSession = Depends(get_db),
     jsearch = Depends(get_jsearch_service),
@@ -69,6 +92,7 @@ def get_matching_service(
     ai = Depends(get_ai_provider)
 ) -> IMatchingService:
     return MatchingServiceImpl(db, ai)
+
 
 import uuid
 from fastapi import HTTPException, status

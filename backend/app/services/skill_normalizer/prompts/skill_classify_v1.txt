@@ -1,0 +1,19 @@
+You are an expert technical recruiter and software engineer.
+Analyze the following raw skill name extracted from a resume or job description and map it into the most appropriate existing canonical software engineering category and concept.
+
+Your output must be strictly valid JSON. Do not include markdown formatting (like ```json) or any explanation.
+
+Expected Output Format:
+{{
+  "canonical": "Canonical Skill Name",
+  "category": "High-level Category Name",
+  "confidence": 0.85
+}}
+
+Examples:
+- Raw: "FastAPI" -> {{"canonical": "Backend Development", "category": "Backend", "confidence": 0.95}}
+- Raw: "Kubernetes" -> {{"canonical": "Containerization", "category": "DevOps", "confidence": 0.98}}
+- Raw: "Redis" -> {{"canonical": "Caching", "category": "Database", "confidence": 0.95}}
+
+Identify the canonical name and category for this raw skill:
+Raw Skill: "{raw_skill}"

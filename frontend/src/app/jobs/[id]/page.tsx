@@ -89,6 +89,7 @@ export default function JobDetailPage() {
     );
   }
 
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
       <AppHeader />
@@ -106,7 +107,7 @@ export default function JobDetailPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2 min-w-0">
               <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white">{job.title}</h1>
-              <p className="flex items-center gap-1.5 font-semibold text-muted-foreground">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                 <Building2 className="h-4 w-4" /> {job.company}
               </p>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-medium text-muted-foreground">

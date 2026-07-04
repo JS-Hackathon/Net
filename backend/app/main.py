@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db, engine
 from app.core.dependencies import get_ai_provider, get_jsearch_service
 from app.exceptions.handlers import register_exception_handlers
+from app.models import Base
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +64,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.on_event("startup")
+async def startup_event():
+    if settings.DATABASE_URL.startswith("sqlite"):
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Created SQLite database tables successfully.")
+
+
 # CORS Configuration
 origins = [o.strip().rstrip("/") for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
@@ -102,6 +111,7 @@ from app.api.v1.upload import router as upload_router
 from app.api.v1.resumes import router as resumes_router
 from app.api.v1.analyses import router as analyses_router
 from app.api.v1.profiles import router as profiles_router
+from app.api.v1.matching import router as matching_router
 from app.api.v1.jobs import router as jobs_router
 from app.api.v1.matches import router as matches_router
 
@@ -110,6 +120,7 @@ app.include_router(upload_router, prefix=settings.API_V1_STR)
 app.include_router(resumes_router, prefix=settings.API_V1_STR)
 app.include_router(analyses_router, prefix=settings.API_V1_STR)
 app.include_router(profiles_router, prefix=settings.API_V1_STR)
+app.include_router(matching_router, prefix=settings.API_V1_STR)
 app.include_router(jobs_router, prefix=settings.API_V1_STR)
 app.include_router(matches_router, prefix=settings.API_V1_STR)
 
