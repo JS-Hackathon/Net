@@ -13,6 +13,7 @@ from app.services.prompts.resume_prompts import (
     build_resume_pdf_prompt,
 )
 from app.services.prompts.interview_prompts import INTERVIEW_SCHEMA, build_interview_prompt
+from app.services.prompts.jd_prompts import JOB_SCHEMA, build_jd_text_prompt, build_jd_pdf_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,65 @@ class GeminiProvider(AIProvider):
             if s.rstrip().endswith("```"):
                 s = s.rstrip()[:-3]
         return s.strip()
+
+    async def parse_job_description(self, text: str, pdf_bytes: bytes | None = None) -> Dict[str, Any]:
+        """Parse an uploaded Job Description into a structured job (maps to the
+        jobs table). Same shape/robustness as parse_resume: structured output,
+        text or multimodal PDF path, retries, 429-aware, key in header."""
+        if not self.api_key:
+            raise ValueError("GEMINI_API_KEY is not configured in environment variables.")
+
+        if pdf_bytes is not None:
+            parts = [
+                {"text": build_jd_pdf_prompt()},
+                {"inline_data": {"mime_type": "application/pdf",
+                                 "data": base64.b64encode(pdf_bytes).decode("ascii")}},
+            ]
+        else:
+            parts = [{"text": build_jd_text_prompt(text)}]
+
+        payload = {
+            "contents": [{"parts": parts}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 8192,
+                "responseMimeType": "application/json",
+                "responseSchema": JOB_SCHEMA,
+            },
+        }
+
+        last_status: int | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self._endpoint(self.parse_model), json=payload,
+                        headers=self._headers(), timeout=45.0,
+                    )
+                if response.status_code == 429:
+                    last_status = 429
+                    wait = self._retry_after_seconds(response, default=3.0 * (attempt + 1))
+                    logger.warning(f"Gemini parse_jd rate-limited (429); backoff {wait:.1f}s ({attempt + 1}/3)")
+                    if attempt < 2:
+                        await asyncio.sleep(wait)
+                    continue
+                response.raise_for_status()
+                res_data = response.json()
+                content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(self._strip_json_fences(content))
+            except httpx.HTTPStatusError as e:
+                last_status = e.response.status_code
+                logger.warning(f"Gemini parse_jd attempt {attempt + 1}/3: HTTP {last_status}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Gemini parse_jd attempt {attempt + 1}/3 failed: {type(e).__name__}")
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+
+        if last_status == 429:
+            raise ValueError("Hệ thống AI đang quá tải. Vui lòng thử lại sau ít phút.")
+        raise ValueError("Không phân tích được mô tả công việc (JD). Vui lòng thử lại sau.")
 
     @property
     def model_version(self) -> str:

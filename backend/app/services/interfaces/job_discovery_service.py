@@ -19,6 +19,13 @@ class IJobDiscoveryService:
         JSearch API, chuẩn hóa và lưu cache, rồi trả về kèm cờ đã bookmark + phân trang."""
         ...
 
+    async def ingest_job_upload(
+        self, user_id: uuid.UUID, file_bytes: bytes, filename: str, content_type: str
+    ) -> Dict[str, Any]:
+        """Tải lên file JD (PDF/DOCX) → AI phân tích → lưu vào bảng jobs để
+        tìm kiếm/so khớp như job crawl. Trả về job đã tạo."""
+        ...
+
     async def get_job_details(self, user_id: uuid.UUID, job_id: uuid.UUID) -> Dict[str, Any]:
         """Lấy chi tiết một job, ghi nhận tương tác 'viewed' và trả cờ bookmark."""
         ...

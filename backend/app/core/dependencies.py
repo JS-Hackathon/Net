@@ -59,9 +59,10 @@ def get_candidate_profile_service(
 
 def get_job_discovery_service(
     db: AsyncSession = Depends(get_db),
-    jsearch = Depends(get_jsearch_service)
+    jsearch = Depends(get_jsearch_service),
+    ai = Depends(get_ai_provider),
 ) -> IJobDiscoveryService:
-    return JobDiscoveryServiceImpl(db, jsearch)
+    return JobDiscoveryServiceImpl(db, jsearch, ai)
 
 def get_matching_service(
     db: AsyncSession = Depends(get_db),

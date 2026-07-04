@@ -37,3 +37,17 @@ class AIProvider(Protocol):
                 preparation_tips[], closing }.
         """
         ...
+
+    async def parse_job_description(self, text: str, pdf_bytes: bytes | None = None) -> Dict[str, Any]:
+        """Parse an uploaded Job Description into a structured job dict.
+
+        Args:
+            text (str): Extracted plain text (normal path).
+            pdf_bytes (bytes | None): Raw PDF for multimodal/OCR (scanned JD).
+
+        Returns:
+            Dict[str, Any]: { title, company_name, location, employment_type,
+                experience_level, salary_min, salary_max, salary_currency,
+                description, requirements, benefits, skills_required[], industry }.
+        """
+        ...

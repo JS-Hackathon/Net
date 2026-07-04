@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
@@ -54,6 +54,30 @@ async def search_jobs(
     )
     await db.commit()
     return JobSearchResponse(success=True, data=JobSearchResponseData(**result))
+
+
+@router.post(
+    "/upload",
+    response_model=JobDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Tải lên JD (mô tả công việc)",
+    description="Tải lên file JD (PDF/DOCX). AI phân tích thành tin tuyển dụng có cấu trúc và thêm vào danh sách để tìm kiếm & Auto Match.",
+)
+async def upload_job_description(
+    file: UploadFile = File(..., description="File JD (PDF hoặc DOCX)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> JobDetailResponse:
+    file_bytes = await file.read()
+    job = await service.ingest_job_upload(
+        user_id=current_user.id,
+        file_bytes=file_bytes,
+        filename=file.filename,
+        content_type=file.content_type,
+    )
+    await db.commit()
+    return JobDetailResponse(success=True, data=JobDetailData(**job))
 
 
 @router.get(

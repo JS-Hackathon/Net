@@ -1,15 +1,19 @@
+import os
 import uuid
+import hashlib
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions.base import NotFoundError, JSearchAPIException
+from app.exceptions.base import NotFoundError, JSearchAPIException, ValidationError
 from app.models.job import Job, SavedSearch, JobRecommendation
 from app.repositories.job_repository import JobRepository
 from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.services.interfaces.job_discovery_service import IJobDiscoveryService
 from app.services.interfaces.jsearch_service import JSearchService
+from app.services.interfaces.ai_provider import AIProvider
+from app.services.text_extractor import TextExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +23,75 @@ RECOMMENDATION_ALGO_VERSION = "reco-1.0"
 
 
 class JobDiscoveryServiceImpl(IJobDiscoveryService):
-    def __init__(self, db: AsyncSession, jsearch: JSearchService):
+    def __init__(self, db: AsyncSession, jsearch: JSearchService, ai: AIProvider | None = None):
         self.db = db
         self.jsearch = jsearch
+        self.ai = ai
         self.repo = JobRepository(db)
         self.profile_repo = CandidateProfileRepository(db)
+
+    # ------------------------------------------------------------------ JD upload
+    async def ingest_job_upload(
+        self, user_id: uuid.UUID, file_bytes: bytes, filename: str, content_type: str
+    ) -> Dict[str, Any]:
+        """Upload a JD file (PDF/DOCX) → AI-parse → upsert into the jobs table,
+        so it becomes searchable/matchable like a crawled job. Mirrors CV upload."""
+        if self.ai is None:
+            raise ValidationError("Chức năng phân tích JD chưa sẵn sàng.")
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise ValidationError("Kích thước file vượt quá giới hạn cho phép (tối đa 5MB).")
+        ext = os.path.splitext(filename or "")[1].lower()
+        if ext not in (".pdf", ".docx"):
+            raise ValidationError("Chỉ hỗ trợ tải lên JD định dạng PDF hoặc DOCX.")
+
+        raw_text = TextExtractor.extract_text(file_bytes, ext.lstrip("."))
+        if len((raw_text or "").strip()) >= 50:
+            parsed = await self.ai.parse_job_description(text=raw_text)
+        elif ext == ".pdf":
+            parsed = await self.ai.parse_job_description(text="", pdf_bytes=file_bytes)
+        else:
+            raise ValidationError(
+                "Không đọc được nội dung JD (có thể là ảnh/scan). Vui lòng dùng PDF có chữ."
+            )
+
+        if not parsed or not parsed.get("title"):
+            raise ValidationError("Không nhận diện được thông tin việc làm từ JD.")
+
+        file_hash = hashlib.sha256(file_bytes).hexdigest()[:16]
+        data = self._transform_parsed_jd(parsed, external_id=f"upload-{file_hash}")
+        job = await self.repo.upsert_job(data)
+        await self.db.flush()
+        return self._serialize_job(job, is_bookmarked=False, full=True)
+
+    def _transform_parsed_jd(self, parsed: Dict[str, Any], external_id: str) -> Dict[str, Any]:
+        """Normalize a parsed JD into the internal `jobs` schema (clip + coerce)."""
+        now = datetime.now(timezone.utc)
+        emp = (parsed.get("employment_type") or "").lower().strip() or None
+        skills = parsed.get("skills_required")
+        return {
+            "external_job_id": self._clip(external_id, 255),
+            "title": self._clip(parsed.get("title") or "Vị trí tuyển dụng", 500),
+            "company_name": self._clip(parsed.get("company_name") or "Chưa rõ công ty", 255),
+            "company_logo_url": None,
+            "location": self._clip(parsed.get("location"), 255),
+            "job_type": self._clip(emp, 100),
+            "employment_type": self._clip(emp, 100),
+            "experience_level": self._clip(parsed.get("experience_level"), 100),
+            "salary_min": self._to_int(parsed.get("salary_min")),
+            "salary_max": self._to_int(parsed.get("salary_max")),
+            "salary_currency": self._clip(parsed.get("salary_currency") or "USD", 10),
+            "description": parsed.get("description"),
+            "requirements": parsed.get("requirements"),
+            "benefits": parsed.get("benefits"),
+            "skills_required": skills if isinstance(skills, list) else [],
+            "industry": self._clip(parsed.get("industry"), 255),
+            "posted_date": now,
+            "application_url": None,
+            "source_platform": "upload",
+            "cached_at": now,
+            "expires_at": None,  # uploaded JDs never expire from the cache
+            "is_active": True,
+        }
 
     # ------------------------------------------------------------------ search
     async def search_jobs(
