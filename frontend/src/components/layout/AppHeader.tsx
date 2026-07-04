@@ -45,15 +45,9 @@ export const AppHeader: React.FC = () => {
           <span className="font-bold tracking-wide hidden sm:inline">MockAI</span>
         </Link>
 
-        <!-- Google tag (gtag.js) -->
+        {/* Google tag (gtag.js) */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-J53S2RH952"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-
-          gtag('config', 'G-J53S2RH952');
-        </script>
+        <script async src="/gganalytic.js"></script>
 
         <div className="flex items-center gap-1">
           <nav className="flex items-center gap-1">
