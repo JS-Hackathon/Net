@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Sparkles, Bookmark, User, LogOut } from "lucide-react";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import { useAuthStore } from "@/lib/store/authStore";
 
 const LINKS = [
@@ -45,9 +44,6 @@ export const AppHeader: React.FC = () => {
           </div>
           <span className="font-bold tracking-wide hidden sm:inline">MockAI</span>
         </Link>
-
-        {/* Google tag (gtag.js) */}
-        <GoogleAnalytics gaId="G-J53S2RH952" />
 
         <div className="flex items-center gap-1">
           <nav className="flex items-center gap-1">
