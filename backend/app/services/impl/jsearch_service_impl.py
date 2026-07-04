@@ -37,9 +37,9 @@ class JSearchServiceImpl(JSearchService):
             "page": str(page),
             "num_pages": "1",
         }
-        _country = (country or settings.JSEARCH_COUNTRY or "").strip()
-        if _country:
-            params["country"] = _country
+        # Force country to "vn" (Vietnam) to restrict searches only to Vietnam
+        _country = "vn"
+        params["country"] = _country
         _date = (date_posted or settings.JSEARCH_DATE_POSTED or "").strip()
         if _date and _date != "all":  # "all" is JSearch's default; omit it
             params["date_posted"] = _date
