@@ -23,8 +23,9 @@ export default function ForgotPasswordPage() {
       await authService.forgotPassword(email);
       toast.success("Yêu cầu khôi phục mật khẩu đã được gửi!");
       setIsSubmitted(true);
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đã xảy ra lỗi trong quá trình gửi yêu cầu.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đã xảy ra lỗi trong quá trình gửi yêu cầu.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);

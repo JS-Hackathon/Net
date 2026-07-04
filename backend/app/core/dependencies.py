@@ -22,6 +22,10 @@ from app.services.interfaces.resume_analysis_service import IResumeAnalysisServi
 from app.services.impl.resume_analysis_service_impl import ResumeAnalysisServiceImpl
 from app.services.interfaces.candidate_profile_service import ICandidateProfileService
 from app.services.impl.candidate_profile_service_impl import CandidateProfileServiceImpl
+from app.services.interfaces.job_discovery_service import IJobDiscoveryService
+from app.services.impl.job_discovery_service_impl import JobDiscoveryServiceImpl
+from app.services.interfaces.matching_service import IMatchingService
+from app.services.impl.matching_service_impl import MatchingServiceImpl
 
 from app.services.interfaces.skill_normalizer_service import ISkillNormalizerService
 from app.services.impl.skill_normalizer_service_impl import SkillNormalizerServiceImpl
@@ -74,6 +78,19 @@ def get_job_matching_service(
     confidence_engine: IConfidenceEngineService = Depends(get_confidence_engine_service)
 ) -> IJobMatchingService:
     return JobMatchingServiceImpl(skill_normalizer, confidence_engine)
+
+
+def get_job_discovery_service(
+    db: AsyncSession = Depends(get_db),
+    jsearch = Depends(get_jsearch_service)
+) -> IJobDiscoveryService:
+    return JobDiscoveryServiceImpl(db, jsearch)
+
+def get_matching_service(
+    db: AsyncSession = Depends(get_db),
+    ai = Depends(get_ai_provider)
+) -> IMatchingService:
+    return MatchingServiceImpl(db, ai)
 
 
 import uuid

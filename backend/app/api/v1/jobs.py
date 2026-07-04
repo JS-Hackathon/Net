@@ -1,13 +1,29 @@
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import List, Dict, Any
+import json
+from pydantic import BaseModel, Field
+import httpx
+
+from app.core.database import get_db
+from app.core.dependencies import get_current_user, get_job_discovery_service, get_ai_provider
+from app.models.user import User
+from app.schemas.job import (
+    JobSearchResponse, JobSearchResponseData,
+    JobDetailResponse, JobDetailData,
+    BookmarkActionResponse, BookmarkActionData,
+    BookmarkListResponse, BookmarkListData,
+    SavedSearchRequest, SavedSearchResponse, SavedSearchData,
+    SavedSearchListResponse, SavedSearchListData,
+    RecommendationListResponse, RecommendationListData,
+)
+from app.services.interfaces.job_discovery_service import IJobDiscoveryService
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
-from app.core.dependencies import get_current_user, get_jsearch_service
-from app.models.user import User
-from app.services.interfaces.jsearch_service import JSearchService
 
 router = APIRouter(
     prefix="/jobs",
@@ -16,50 +32,169 @@ router = APIRouter(
 
 @router.get(
     "/search",
-    response_model=List[Dict[str, Any]],
-    summary="Tìm kiếm công việc thông qua JSearch API",
-    description="Tìm kiếm cơ hội việc làm theo từ khóa, vị trí hoặc tiêu đề."
+    response_model=JobSearchResponse,
+    summary="Tìm kiếm việc làm",
+    description="Tìm kiếm việc làm qua JSearch API (có cache 4 giờ), hỗ trợ lọc theo địa điểm, mức lương, hình thức làm việc và phân trang."
 )
 async def search_jobs(
-    query: str = Query(default="Python Developer", description="Từ khóa tìm kiếm (tiêu đề, kỹ năng, địa điểm)."),
-    page: int = Query(default=1, ge=1, description="Trang số."),
+    q: str = Query(..., description="Từ khóa tìm kiếm (chức danh, kỹ năng)"),
+    location: str | None = Query(default=None),
+    employment_type: str | None = Query(default=None, description="remote, hybrid, on-site"),
+    experience_level: str | None = Query(default=None, description="entry, mid, senior"),
+    salary_min: int | None = Query(default=None, ge=0),
+    remote: bool = Query(default=False),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
-    jsearch_service: JSearchService = Depends(get_jsearch_service)
-) -> List[Dict[str, Any]]:
-    jobs = await jsearch_service.search_jobs(query, page)
-    return jobs
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> JobSearchResponse:
+    result = await service.search_jobs(
+        user_id=current_user.id,
+        query=q,
+        location=location,
+        employment_type=employment_type,
+        experience_level=experience_level,
+        salary_min=salary_min,
+        remote_only=remote,
+        page=page,
+        per_page=per_page,
+    )
+    await db.commit()
+    return JobSearchResponse(success=True, data=JobSearchResponseData(**result))
+
+
+@router.get(
+    "/bookmarks",
+    response_model=BookmarkListResponse,
+    summary="Danh sách việc làm đã lưu",
+    description="Lấy danh sách các tin tuyển dụng người dùng đã bookmark."
+)
+async def get_bookmarks(
+    current_user: User = Depends(get_current_user),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> BookmarkListResponse:
+    bookmarks = await service.get_bookmarks(user_id=current_user.id)
+    return BookmarkListResponse(
+        success=True,
+        data=BookmarkListData(bookmarks=bookmarks, total=len(bookmarks)),
+    )
+
+
+@router.get(
+    "/recommendations",
+    response_model=RecommendationListResponse,
+    summary="Gợi ý việc làm theo hồ sơ",
+    description="Gợi ý các việc làm phù hợp nhất dựa trên kỹ năng trong hồ sơ ứng viên."
+)
+async def get_recommendations(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> RecommendationListResponse:
+    recs = await service.get_recommendations(user_id=current_user.id)
+    await db.commit()
+    return RecommendationListResponse(
+        success=True,
+        data=RecommendationListData(recommendations=recs, total=len(recs)),
+    )
+
+
+@router.get(
+    "/saved-searches",
+    response_model=SavedSearchListResponse,
+    summary="Danh sách tìm kiếm đã lưu",
+)
+async def list_saved_searches(
+    current_user: User = Depends(get_current_user),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> SavedSearchListResponse:
+    searches = await service.list_saved_searches(user_id=current_user.id)
+    return SavedSearchListResponse(
+        success=True,
+        data=SavedSearchListData(saved_searches=searches, total=len(searches)),
+    )
+
+
+@router.post(
+    "/saved-searches",
+    response_model=SavedSearchResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Lưu bộ tiêu chí tìm kiếm",
+    description="Lưu lại tiêu chí tìm kiếm để nhận thông báo khi có việc làm mới phù hợp."
+)
+async def create_saved_search(
+    payload: SavedSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> SavedSearchResponse:
+    saved = await service.create_saved_search(
+        user_id=current_user.id,
+        name=payload.name,
+        criteria=payload.search_criteria,
+        alert_frequency=payload.alert_frequency,
+    )
+    await db.commit()
+    return SavedSearchResponse(success=True, data=SavedSearchData(**saved))
+
 
 @router.get(
     "/{job_id}",
-    response_model=Dict[str, Any],
-    summary="Lấy chi tiết công việc",
-    description="Lấy thông tin chi tiết của một công việc cụ thể dựa trên Job ID."
+    response_model=JobDetailResponse,
+    summary="Chi tiết việc làm",
+    description="Xem thông tin chi tiết một tin tuyển dụng và ghi nhận lượt xem."
 )
-async def get_job_detail(
+async def get_job_details(
     job_id: str,
     current_user: User = Depends(get_current_user),
-    jsearch_service: JSearchService = Depends(get_jsearch_service)
-) -> Dict[str, Any]:
-    jobs = await jsearch_service.search_jobs(job_id, page=1)
-    if not jobs:
-        return {
-            "job_id": job_id,
-            "job_title": "Software Engineer",
-            "employer_name": "Tech Corp",
-            "job_description": "We are seeking a talented engineer to join our team. Requirement: Experience with Backend Development and SQL Database.",
-            "job_city": "Ho Chi Minh City",
-            "job_country": "Vietnam",
-            "job_apply_link": "https://example.com/apply",
-            "job_max_salary": 2000,
-            "job_salary_currency": "USD"
-        }
-    return jobs[0]
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> JobDetailResponse:
+    job = await service.get_job_details(user_id=current_user.id, job_id=uuid.UUID(job_id))
+    await db.commit()
+    return JobDetailResponse(success=True, data=JobDetailData(**job))
 
-from pydantic import BaseModel, Field
-import json
-from app.core.config import settings
-import httpx
 
+@router.post(
+    "/{job_id}/bookmark",
+    response_model=BookmarkActionResponse,
+    summary="Lưu việc làm",
+)
+async def bookmark_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> BookmarkActionResponse:
+    await service.bookmark_job(user_id=current_user.id, job_id=uuid.UUID(job_id))
+    await db.commit()
+    return BookmarkActionResponse(
+        success=True,
+        data=BookmarkActionData(message="Đã lưu việc làm", is_bookmarked=True),
+    )
+
+
+@router.delete(
+    "/{job_id}/bookmark",
+    response_model=BookmarkActionResponse,
+    summary="Bỏ lưu việc làm",
+)
+async def unbookmark_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: IJobDiscoveryService = Depends(get_job_discovery_service),
+) -> BookmarkActionResponse:
+    await service.unbookmark_job(user_id=current_user.id, job_id=uuid.UUID(job_id))
+    await db.commit()
+    return BookmarkActionResponse(
+        success=True,
+        data=BookmarkActionData(message="Đã bỏ lưu việc làm", is_bookmarked=False),
+    )
+
+
+# --- Preserved: AI extract-requirements endpoint from feat-matching (kept) ---
 class ExtractRequest(BaseModel):
     job_description: str = Field(..., description="Raw text of the job description.")
 

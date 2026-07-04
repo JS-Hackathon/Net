@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { Loader2 } from "lucide-react";
 
-export default function LoginSuccessPage() {
+function LoginSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setTokens, checkAuth } = useAuthStore();
@@ -24,9 +24,12 @@ export default function LoginSuccessPage() {
       // Lưu token vào localStorage qua Zustand action
       setTokens(accessToken, refreshToken);
 
-      // Gọi checkAuth để fetch thông tin user profile
-      checkAuth(true).then(() => {
-        router.push("/");
+      // Nạp hồ sơ, rồi chỉ điều hướng khi phiên vẫn còn hiệu lực. Nếu token bị
+      // thu hồi (đăng nhập thật sự thất bại) mới đưa về /login kèm mã lỗi —
+      // tránh việc lỗi mạng/CORS tạm thời đá người dùng ra khỏi phiên.
+      checkAuth(true).finally(() => {
+        const hasSession = !!useAuthStore.getState().accessToken;
+        router.push(hasSession ? "/" : "/login?error=session_setup_failed");
       });
     } else {
       router.push("/login");
@@ -45,5 +48,17 @@ export default function LoginSuccessPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+      </div>
+    }>
+      <LoginSuccessContent />
+    </Suspense>
   );
 }

@@ -22,3 +22,15 @@ class ValidationError(AppException):
     def __init__(self, message: str = "Validation failed", details: list = None):
         super().__init__(message, status_code=422, error_code="VALIDATION_ERROR")
         self.details = details or []
+
+
+class JSearchAPIException(AppException):
+    """Raised when the external JSearch job API fails."""
+    def __init__(self, message: str = "Job search service is temporarily unavailable"):
+        super().__init__(message, status_code=502, error_code="JSEARCH_API_ERROR")
+
+
+class AIMatchingException(AppException):
+    """Raised when the AI matching workflow fails."""
+    def __init__(self, message: str = "AI matching failed"):
+        super().__init__(message, status_code=502, error_code="AI_MATCHING_ERROR")

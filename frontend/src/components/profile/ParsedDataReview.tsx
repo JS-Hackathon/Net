@@ -16,9 +16,59 @@ import {
 import { ResumeAnalysis } from "@/lib/services/analysis";
 import { ConfidenceIndicator } from "./ConfidenceIndicator";
 
+export interface WorkExperience {
+  title?: string;
+  company?: string;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+  description?: string;
+  key_achievements?: string[];
+  technologies_used?: string[];
+}
+
+export interface Education {
+  degree?: string;
+  field_of_study?: string;
+  institution?: string;
+  location?: string;
+  graduation_date?: string;
+  gpa?: string;
+}
+
+export interface TechnicalSkill {
+  name?: string;
+  category?: string;
+  proficiency?: string;
+}
+
+export interface Certification {
+  name?: string;
+  issuer?: string;
+  issue_date?: string;
+  credential_id?: string;
+}
+
+export interface PersonalInfo {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+}
+
+export interface ParsedData {
+  personal_info?: PersonalInfo;
+  professional_summary?: string;
+  work_experience?: WorkExperience[];
+  education?: Education[];
+  technical_skills?: TechnicalSkill[];
+  certifications?: Certification[];
+}
+
 interface ParsedDataReviewProps {
   analysis: ResumeAnalysis;
-  onApprove: (corrections: Record<string, any>) => void;
+  onApprove: (corrections: Record<string, unknown>) => void;
   onCancel: () => void;
 }
 
@@ -27,32 +77,32 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
   onApprove,
   onCancel,
 }) => {
-  const [editedData, setEditedData] = useState<any>(JSON.parse(JSON.stringify(analysis.parsedData || {})));
-  const [corrections, setCorrections] = useState<Record<string, any>>({});
+  const [editedData, setEditedData] = useState<ParsedData>(JSON.parse(JSON.stringify(analysis.parsedData || {})));
+  const [corrections, setCorrections] = useState<Record<string, unknown>>({});
   const [activeTab, setActiveTab] = useState<"personal" | "experience" | "education" | "skills" | "certs">("personal");
 
-  const updateField = (path: string, value: any) => {
+  const updateField = (path: string, value: unknown) => {
     // Update local edited state
     const newData = { ...editedData };
     const parts = path.split(".");
-    let curr = newData;
+    let curr: unknown = newData;
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
       if (part.match(/^\d+$/)) {
-        curr = curr[parseInt(part)];
+        curr = (curr as unknown[])[parseInt(part)];
       } else {
-        curr = curr[part];
+        curr = (curr as Record<string, unknown>)[part];
       }
     }
     
     const last = parts[parts.length - 1];
     if (last.match(/^\d+$/)) {
-      curr[parseInt(last)] = value;
+      (curr as unknown[])[parseInt(last)] = value;
     } else {
-      curr[last] = value;
+      (curr as Record<string, unknown>)[last] = value;
     }
     
-    setEditedData(newData);
+    setEditedData(newData as ParsedData);
 
     // Track correction path
     setCorrections(prev => ({
@@ -83,7 +133,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
   };
 
   const removeExperience = (idx: number) => {
-    const list = (editedData.work_experience || []).filter((_: any, i: number) => i !== idx);
+    const list = (editedData.work_experience || []).filter((_, i) => i !== idx);
     updateField("work_experience", list);
   };
 
@@ -102,7 +152,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
   };
 
   const removeEducation = (idx: number) => {
-    const list = (editedData.education || []).filter((_: any, i: number) => i !== idx);
+    const list = (editedData.education || []).filter((_, i) => i !== idx);
     updateField("education", list);
   };
 
@@ -114,7 +164,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
   };
 
   const removeSkill = (idx: number) => {
-    const list = (editedData.technical_skills || []).filter((_: any, i: number) => i !== idx);
+    const list = (editedData.technical_skills || []).filter((_, i) => i !== idx);
     updateField("technical_skills", list);
   };
 
@@ -126,7 +176,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
   };
 
   const removeCert = (idx: number) => {
-    const list = (editedData.certifications || []).filter((_: any, i: number) => i !== idx);
+    const list = (editedData.certifications || []).filter((_, i) => i !== idx);
     updateField("certifications", list);
   };
 
@@ -272,7 +322,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
               </div>
 
               <div className="space-y-4">
-                {(editedData.work_experience || []).map((exp: any, idx: number) => (
+                {(editedData.work_experience || []).map((exp: WorkExperience, idx: number) => (
                   <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 space-y-4 relative group">
                     <button
                       onClick={() => removeExperience(idx)}
@@ -354,7 +404,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
               </div>
 
               <div className="space-y-4">
-                {(editedData.education || []).map((edu: any, idx: number) => (
+                {(editedData.education || []).map((edu: Education, idx: number) => (
                   <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 space-y-4 relative group">
                     <button
                       onClick={() => removeEducation(idx)}
@@ -426,15 +476,15 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
               </div>
 
               <div className="grid md:grid-cols-2 gap-3.5">
-                {(editedData.technical_skills || []).map((skill: any, idx: number) => (
+                {(editedData.technical_skills || []).map((skill: TechnicalSkill, idx: number) => (
                   <div key={idx} className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/20 dark:bg-zinc-900/30 flex items-center gap-3 relative group">
                     <div className="flex-1 min-w-0 grid grid-cols-2 gap-2">
                       <input
                         type="text"
                         value={skill.name || ""}
                         onChange={e => {
-                          const list = [...editedData.technical_skills];
-                          list[idx].name = e.target.value;
+                          const list = [...(editedData.technical_skills || [])];
+                          list[idx] = { ...list[idx], name: e.target.value };
                           updateField("technical_skills", list);
                         }}
                         className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-bold text-xs"
@@ -443,8 +493,8 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
                       <select
                         value={skill.proficiency || "Intermediate"}
                         onChange={e => {
-                          const list = [...editedData.technical_skills];
-                          list[idx].proficiency = e.target.value;
+                          const list = [...(editedData.technical_skills || [])];
+                          list[idx] = { ...list[idx], proficiency: e.target.value };
                           updateField("technical_skills", list);
                         }}
                         className="px-2 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-bold text-xs"
@@ -484,7 +534,7 @@ export const ParsedDataReview: React.FC<ParsedDataReviewProps> = ({
               </div>
 
               <div className="space-y-4">
-                {(editedData.certifications || []).map((cert: any, idx: number) => (
+                {(editedData.certifications || []).map((cert: Certification, idx: number) => (
                   <div key={idx} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-900/30 space-y-4 relative group">
                     <button
                       onClick={() => removeCert(idx)}

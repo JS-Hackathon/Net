@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/store/authStore";
 import { toast } from "sonner";
-import { UserPlus, Mail, Lock, User, Check, ShieldCheck, ArrowRight, ShieldAlert } from "lucide-react";
+import { UserPlus, Mail, Lock, User, ArrowRight, ShieldAlert } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [mockGoogleEmail, setMockGoogleEmail] = useState("");
-  const [showMockGoogle, setShowMockGoogle] = useState(false);
+  const [showMockGoogle] = useState(false);
 
   // Mật khẩu có đạt chuẩn độ khó tối thiểu không
   const isPasswordStrong = (pw: string) => {
@@ -78,8 +78,9 @@ export default function RegisterPage() {
       });
       toast.success("Đăng ký tài khoản ứng viên thành công!");
       router.push("/login");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng ký thất bại. Email có thể đã được sử dụng.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng ký thất bại. Email có thể đã được sử dụng.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -92,8 +93,9 @@ export default function RegisterPage() {
       await googleLogin({ googleToken: token });
       toast.success("Đăng ký qua tài khoản Google thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng ký qua Google thất bại";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng ký qua Google thất bại";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -288,7 +290,7 @@ export default function RegisterPage() {
             {/* Google Signup Button */}
             <button
               type="button"
-              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/google/login"}
+              onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/auth/google/login`}
               disabled={isLoading || isSubmitting}
               className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition duration-200"
             >

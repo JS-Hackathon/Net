@@ -29,13 +29,22 @@ export default function Home() {
 
         <nav className="flex items-center gap-4">
           {isInitialized && user ? (
-            <Link
-              href="/profile"
-              className="flex items-center gap-1.5 py-2 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-md shadow-primary/20 hover:opacity-95 transition"
-            >
-              <User className="h-4 w-4" />
-              Hồ sơ ứng viên
-            </Link>
+            <>
+              <Link
+                href="/jobs"
+                className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-sm font-semibold hover:text-primary transition"
+              >
+                <Sparkles className="h-4 w-4" />
+                Tìm việc
+              </Link>
+              <Link
+                href="/profile"
+                className="flex items-center gap-1.5 py-2 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-md shadow-primary/20 hover:opacity-95 transition"
+              >
+                <User className="h-4 w-4" />
+                Hồ sơ ứng viên
+              </Link>
+            </>
           ) : (
             <>
               <Link

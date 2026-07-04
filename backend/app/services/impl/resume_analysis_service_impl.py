@@ -18,6 +18,11 @@ from app.services.text_extractor import TextExtractor
 
 logger = logging.getLogger(__name__)
 
+# Below this many extracted characters we treat the CV as "no readable text"
+# (likely a scanned/image PDF) and fall back to sending the PDF to the AI directly.
+MIN_EXTRACTED_TEXT_CHARS = 50
+
+
 class ResumeAnalysisServiceImpl(IResumeAnalysisService):
     def __init__(
         self, 
@@ -91,9 +96,21 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
                 resume.text_extraction_status = "completed"
                 await session.flush()
 
-                # 3. Call AI parsing
-                parsed_json = await self.ai.parse_resume(raw_text)
-                
+                # 3. Call AI parsing. Normally send the extracted text; if extraction
+                # yielded almost nothing (likely a scanned/image PDF), send the PDF
+                # to Gemini directly for multimodal OCR. DOCX can't be OCR'd this way.
+                ftype = (resume.file_type or "").lower().lstrip(".")
+                if len((raw_text or "").strip()) >= MIN_EXTRACTED_TEXT_CHARS:
+                    parsed_json = await self.ai.parse_resume(text=raw_text)
+                elif ftype == "pdf":
+                    logger.info(f"Analysis {analysis_id}: sparse extracted text; sending PDF to AI for OCR.")
+                    parsed_json = await self.ai.parse_resume(text="", pdf_bytes=file_bytes)
+                else:
+                    raise ValueError(
+                        "Không đọc được nội dung văn bản từ CV (có thể là ảnh/scan). "
+                        "Vui lòng tải lên CV dạng PDF có chữ hoặc nhập thông tin thủ công."
+                    )
+
                 if "error" in parsed_json:
                     raise ValueError(parsed_json.get("details", "AI Parsing failed"))
 
@@ -274,7 +291,9 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
         # 2. Professional Summary
         normalized["professional_summary"] = data.get("professional_summary") or data.get("summary")
         normalized["career_objective"] = data.get("career_objective") or data.get("objective")
-        normalized["years_of_experience"] = data.get("years_of_experience") or data.get("experience_years")
+        normalized["years_of_experience"] = self._to_int(
+            data.get("years_of_experience") or data.get("experience_years")
+        )
         normalized["current_role"] = data.get("current_role")
         normalized["current_company"] = data.get("current_company")
 
@@ -371,9 +390,45 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
                 })
         normalized["certifications"] = normalized_certs
 
-        normalized["languages"] = data.get("languages") or []
-        normalized["projects"] = data.get("projects") or []
-        normalized["achievements"] = data.get("achievements") or []
+        # 8. Languages -> {language, proficiency} (accepts str or {name|language})
+        normalized_langs = []
+        for lang in (data.get("languages") or []):
+            if isinstance(lang, str):
+                normalized_langs.append({"language": lang, "proficiency": None})
+            elif isinstance(lang, dict):
+                normalized_langs.append({
+                    "language": lang.get("language") or lang.get("name"),
+                    "proficiency": lang.get("proficiency"),
+                })
+        normalized["languages"] = normalized_langs
+
+        # 9. Projects
+        normalized_projects = []
+        for proj in (data.get("projects") or []):
+            if isinstance(proj, dict):
+                normalized_projects.append({
+                    "name": proj.get("name") or "Project",
+                    "description": proj.get("description"),
+                    "technologies": proj.get("technologies") or [],
+                    "url": proj.get("url"),
+                    "start_date": proj.get("start_date"),
+                    "end_date": proj.get("end_date"),
+                })
+        normalized["projects"] = normalized_projects
+
+        # 10. Achievements
+        normalized_ach = []
+        for ach in (data.get("achievements") or []):
+            if isinstance(ach, str):
+                normalized_ach.append({"title": ach, "description": None, "date": None, "issuer": None})
+            elif isinstance(ach, dict):
+                normalized_ach.append({
+                    "title": ach.get("title") or ach.get("name"),
+                    "description": ach.get("description"),
+                    "date": ach.get("date"),
+                    "issuer": ach.get("issuer"),
+                })
+        normalized["achievements"] = normalized_ach
 
         return normalized
 
@@ -494,6 +549,23 @@ class ResumeAnalysisServiceImpl(IResumeAnalysisService):
             profile.languages = parsed_data.get("languages")
             profile.projects = parsed_data.get("projects")
             profile.achievements = parsed_data.get("achievements")
+
+        # Recompute completeness so the % reflects the freshly parsed data right
+        # away. Previously the score stayed at 0 after parsing and only updated
+        # once the user made a manual edit (which triggers this same recompute).
+        from app.services.impl.candidate_profile_service_impl import CandidateProfileServiceImpl
+        await CandidateProfileServiceImpl(session)._update_profile_completeness(profile)
+
+    @staticmethod
+    def _to_int(value: Any) -> Any:
+        """Coerce a years value (may arrive as str/float from the AI) to int, or None.
+        Guards the Integer `years_of_experience` column against type errors."""
+        if value is None:
+            return None
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
 
     def _set_nested_value(self, data: Dict[str, Any], path: str, value: Any) -> None:
         """Sets a value in a nested dict structure using dot-notation (e.g., 'work_experience.0.title')."""

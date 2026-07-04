@@ -8,6 +8,11 @@ import {
   ProfileUpdatePayload
 } from "../services/auth";
 
+// Extract an HTTP status from an axios-style error, if any. Used to tell a real
+// auth failure (401) apart from a transient network/CORS/5xx blip.
+const statusOf = (err: unknown): number | undefined =>
+  (err as { response?: { status?: number } })?.response?.status;
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -56,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (payload) => {
     set({ isLoading: true });
     try {
-      const data = await authService.register(payload);
+      await authService.register(payload);
     } finally {
       set({ isLoading: false });
     }
@@ -144,16 +149,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = await authService.getMe();
         set({ user });
       } catch (error) {
-        console.warn("Access token invalid, trying to refresh...", error);
-        // Thử refresh token
-        try {
-          const data = await authService.refreshToken({ refreshToken });
-          get().setTokens(data.accessToken, data.refreshToken);
-          const user = await authService.getMe();
-          set({ user });
-        } catch (refreshErr) {
-          console.error("Auto refresh failed, logging out:", refreshErr);
-          get().setTokens(null, null);
+        // Only a genuine 401 means the access token is invalid. Network/CORS/5xx
+        // errors are transient — keep the session so we don't log the user out
+        // over a blip. (This was the root cause of the Google-login redirect loop.)
+        if (statusOf(error) !== 401) {
+          console.warn("checkAuth: getMe failed (non-auth); keeping session.", error);
+        } else {
+          // Access token expired — try to refresh it.
+          try {
+            const data = await authService.refreshToken({ refreshToken });
+            get().setTokens(data.accessToken, data.refreshToken);
+            const user = await authService.getMe();
+            set({ user });
+          } catch (refreshErr) {
+            if (statusOf(refreshErr) === 401) {
+              // Refresh token also rejected — the session is genuinely gone.
+              console.error("checkAuth: refresh rejected; clearing session.", refreshErr);
+              get().setTokens(null, null);
+            } else {
+              console.warn("checkAuth: refresh failed (non-auth); keeping tokens.", refreshErr);
+            }
+          }
         }
       }
     }

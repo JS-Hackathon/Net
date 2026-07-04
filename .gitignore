@@ -17,6 +17,10 @@ db.lock
 .env*.local
 .env.local
 
+# Backend runtime-generated dirs (auto-created at startup, never commit uploads)
+backend/app/static/uploads/
+backend/app/static/exports/
+
 # Python standard ignores
 __pycache__/
 *.py[cod]

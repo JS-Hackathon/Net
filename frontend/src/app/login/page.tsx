@@ -16,13 +16,22 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mockGoogleEmail, setMockGoogleEmail] = useState("");
-  const [showMockGoogle, setShowMockGoogle] = useState(false);
+  const [showMockGoogle] = useState(false);
 
   // Lấy thông điệp thông báo từ redirect nếu có (ví dụ: đổi mật khẩu thành công)
   useEffect(() => {
     const message = searchParams.get("message");
     if (message) {
       toast.success(message);
+    }
+    // Hiển thị lý do khi bị đưa về trang đăng nhập (OAuth lỗi, phiên hết hạn...)
+    const error = searchParams.get("error");
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        google_auth_failed: "Đăng nhập bằng Google thất bại. Vui lòng thử lại.",
+        session_setup_failed: "Không thiết lập được phiên đăng nhập. Vui lòng thử lại.",
+      };
+      toast.error(errorMessages[error] || "Đăng nhập thất bại. Vui lòng thử lại.");
     }
     // Check auth status on mount
     checkAuth();
@@ -47,8 +56,9 @@ function LoginForm() {
       await login({ email, password });
       toast.success("Đăng nhập thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -61,8 +71,9 @@ function LoginForm() {
       await googleLogin({ googleToken: token });
       toast.success("Đăng nhập bằng Google thành công!");
       router.push("/");
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Xác thực qua tài khoản Google thất bại";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || "Xác thực qua tài khoản Google thất bại";
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -191,7 +202,10 @@ function LoginForm() {
             {/* Google OAuth Button */}
             <button
               type="button"
-              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/google/login"}
+              onClick={() => {
+                const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/v1\/?$/, "").replace(/\/api\/?$/, "");
+                window.location.href = `${baseUrl}/api/v1/auth/google/login`;
+              }}
               disabled={isLoading || isSubmitting}
               className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition duration-200"
             >

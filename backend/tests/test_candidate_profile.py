@@ -12,14 +12,19 @@ async def test_resume_upload_parsing_profile_flow(
     db_session: AsyncSession, 
     monkeypatch
 ):
-    # Mock TextExtractor to return a fixed string instead of parsing invalid pdf bytes
+    # Mock TextExtractor to return a fixed string instead of parsing invalid pdf bytes.
+    # Must be longer than MIN_EXTRACTED_TEXT_CHARS so the normal text path is taken.
     monkeypatch.setattr(
         "app.services.impl.resume_analysis_service_impl.TextExtractor.extract_text",
-        lambda file_bytes, file_type: "Nguyen Van A resume content"
+        lambda file_bytes, file_type: (
+            "NGUYEN VAN A\nEmail: candidate@example.com | Phone: 0987654321\n"
+            "Full Stack Developer with 1 year experience in Python/FastAPI and React.\n"
+            "Education: Dai hoc FPT — Computer Science."
+        ),
     )
 
-    # Async mock for GeminiProvider.parse_resume
-    async def mock_parse_resume(self, text: str):
+    # Async mock for GeminiProvider.parse_resume (accepts the optional pdf_bytes arg)
+    async def mock_parse_resume(self, text: str, pdf_bytes=None):
         return {
             "personal_info": {
                 "full_name": "Nguyễn Văn A",

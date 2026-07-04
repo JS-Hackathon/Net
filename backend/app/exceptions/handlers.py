@@ -15,7 +15,7 @@ def _cors_headers(request: Request) -> dict:
     are not treated as CORS failures.  FastAPI's CORSMiddleware only wraps
     the normal response path; exception-handler responses bypass it entirely.
     """
-    allowed = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+    allowed = [o.strip().rstrip("/") for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
     origin = request.headers.get("origin", "")
     if origin in allowed or "*" in allowed:
         return {

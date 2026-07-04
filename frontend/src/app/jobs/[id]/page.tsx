@@ -1,211 +1,188 @@
 "use client";
 
-import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { jobService } from "@/lib/services/job";
-import { profileService } from "@/lib/services/profile";
-import { matchingService, CompareResponse } from "@/lib/services/matching";
-import { MatchScoreDial } from "@/components/jobs/MatchScoreDial";
-import { RequirementMatrixView } from "@/components/jobs/RequirementMatrixView";
+import React, { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
-import { MapPin, DollarSign, Briefcase, FileSearch, Sparkles, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Loader2, Bookmark, BookmarkCheck, MapPin, Building2, Wallet, ExternalLink,
+  Sparkles, ArrowLeft,
+} from "lucide-react";
+import { useAuthStore } from "@/lib/store/authStore";
+import { jobService, JobDetail } from "@/lib/services/jobs";
+import { matchService } from "@/lib/services/matches";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 export default function JobDetailPage() {
-  const { id } = useParams() as { id: string };
   const router = useRouter();
-  const [matchResult, setMatchResult] = useState<CompareResponse | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
+  const params = useParams();
+  const jobId = params.id as string;
+  const { user, checkAuth, isInitialized } = useAuthStore();
 
-  // Fetch job details
-  const { data: job, isLoading: isJobLoading, error: jobError } = useQuery({
-    queryKey: ["job", id],
-    queryFn: () => jobService.getJobDetail(id),
-  });
+  const [job, setJob] = useState<JobDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [matching, setMatching] = useState(false);
 
-  // Fetch candidate profile (to get profile ID)
-  const { data: profile, isLoading: isProfileLoading } = useQuery({
-    queryKey: ["profile"],
-    queryFn: () => profileService.getProfile(),
-  });
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
-  // API Call to extract requirements from JD & compare with profile
-  const matchMutation = useMutation({
-    mutationFn: async () => {
-      if (!job || !profile) {
-        throw new Error("Không đủ thông tin công việc hoặc hồ sơ để so khớp.");
+  useEffect(() => {
+    if (isInitialized && !user) router.push("/login");
+  }, [isInitialized, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        setJob(await jobService.getJob(jobId));
+      } catch {
+        toast.error("Không tải được thông tin việc làm");
+      } finally {
+        setLoading(false);
       }
+    })();
+  }, [user, jobId]);
 
-      setStatusMessage("Đang dùng AI trích xuất yêu cầu tuyển dụng...");
-      
-      // Step 1: Call API to extract requirements from job description
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/jobs/extract-requirements`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`
-        },
-        body: JSON.stringify({ job_description: job.job_description })
-      });
-
-      if (!response.ok) {
-        throw new Error("Lỗi trích xuất yêu cầu công việc từ JD.");
-      }
-      
-      const requirements = await response.json();
-
-      setStatusMessage("Đang đối chiếu yêu cầu với hồ sơ CV của bạn...");
-
-      // Step 2: Call matching API
-      return await matchingService.compare({
-        candidate_profile_id: profile.id,
-        job_id: job.job_id,
-        job_title: job.job_title,
-        company_name: job.employer_name,
-        requirements: requirements
-      });
-    },
-    onSuccess: (data) => {
-      setMatchResult(data);
-      toast.success("So khớp thành công!");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Quá trình so khớp gặp lỗi.");
-    },
-    onSettled: () => {
-      setStatusMessage("");
+  const toggleBookmark = async () => {
+    if (!job) return;
+    try {
+      if (job.isBookmarked) await jobService.unbookmark(job.id);
+      else await jobService.bookmark(job.id);
+      setJob({ ...job, isBookmarked: !job.isBookmarked });
+    } catch {
+      toast.error("Thao tác lưu việc làm thất bại");
     }
-  });
-
-  const handleStartMatching = () => {
-    matchMutation.mutate();
   };
 
-  if (isJobLoading) {
+  const runMatch = async () => {
+    if (!job) return;
+    setMatching(true);
+    toast.info("AI đang phân tích mức độ phù hợp...");
+    try {
+      const result = await matchService.calculateMatch(job.id);
+      toast.success(`Điểm phù hợp: ${Math.round(result.overallScore)}%`);
+      router.push(`/matches/${result.matchId}`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || "So khớp thất bại. Hãy đảm bảo hồ sơ đã hoàn thiện.");
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  if (!isInitialized || loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-40">
-        <Loader2 className="animate-spin text-blue-600 w-10 h-10 mb-4" />
-        <p className="text-gray-500 text-sm font-medium">Đang tải thông tin chi tiết công việc...</p>
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+  if (!user) return null;
+  if (!job) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-black">
+        <AppHeader />
+        <div className="max-w-3xl mx-auto px-6 mt-16 text-center text-muted-foreground">
+          <p className="font-semibold">Không tìm thấy việc làm.</p>
+        </div>
       </div>
     );
   }
 
-  if (jobError || !job) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-        <div className="bg-red-50 border border-red-100 p-6 rounded-2xl">
-          <p className="text-red-700 font-bold mb-4">Không thể tải thông tin công việc</p>
-          <button onClick={() => router.back()} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium">
-            Quay lại
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Back button */}
-      <button
-        onClick={() => router.back()}
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-900 text-sm font-bold mb-6 cursor-pointer"
-      >
-        <ArrowLeft size={16} />
-        <span>Quay lại</span>
-      </button>
+    <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans text-foreground pb-16">
+      <AppHeader />
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column: Job details */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900 leading-snug">{job.job_title}</h1>
-            <p className="text-gray-600 font-medium mt-1">{job.employer_name}</p>
+      <main className="max-w-4xl mx-auto px-6 mt-6 space-y-6">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-primary transition"
+        >
+          <ArrowLeft className="h-4 w-4" /> Quay lại
+        </button>
 
-            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-sm text-gray-500 border-t border-b border-gray-50 py-3">
-              <div className="flex items-center gap-1.5">
-                <MapPin size={16} className="text-gray-400" />
-                <span>{job.job_city || "Từ xa"}, {job.job_country}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <DollarSign size={16} className="text-gray-400" />
-                <span>
-                  {job.job_max_salary 
-                    ? `${job.job_max_salary.toLocaleString()} ${job.job_salary_currency || "USD"}`
-                    : "Thỏa thuận"}
-                </span>
+        {/* Header */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 min-w-0">
+              <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white">{job.title}</h1>
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+                <Building2 className="h-4 w-4" /> {job.company}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-medium text-muted-foreground">
+                {job.location && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {job.location}</span>}
+                {job.salaryRange && <span className="flex items-center gap-1 text-success font-bold"><Wallet className="h-3.5 w-3.5" /> {job.salaryRange}</span>}
+                {job.employmentType && (
+                  <span className="py-0.5 px-2 rounded-full bg-primary/10 text-primary font-bold uppercase tracking-wide text-[10px]">{job.employmentType}</span>
+                )}
               </div>
             </div>
+            <button
+              onClick={toggleBookmark}
+              className="shrink-0 h-10 w-10 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+            >
+              {job.isBookmarked ? <BookmarkCheck className="h-5 w-5 text-primary" /> : <Bookmark className="h-5 w-5 text-zinc-400" />}
+            </button>
+          </div>
 
-            <div className="mt-6">
-              <h2 className="font-bold text-gray-900 text-base mb-3">Mô tả công việc (Job Description)</h2>
-              <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{job.job_description}</p>
-            </div>
-
-            <div className="mt-8 flex justify-end">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={runMatch}
+              disabled={matching}
+              className="flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-gradient-to-r from-primary to-primary/95 text-white font-bold shadow-md shadow-primary/20 hover:opacity-95 active:scale-[0.98] disabled:opacity-60 transition"
+            >
+              {matching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Match với CV của tôi
+            </button>
+            {job.applicationUrl && (
               <a
-                href={job.job_apply_link}
+                href={job.applicationUrl}
                 target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold transition-all"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 py-3 px-6 rounded-xl border border-zinc-200 dark:border-zinc-800 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 transition"
               >
-                Ứng tuyển trực tiếp
+                Ứng tuyển ngay <ExternalLink className="h-4 w-4" />
               </a>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Right Column: Match Analysis */}
-        <div className="space-y-6">
-          
-          {/* Match Trigger Box */}
-          {!matchResult && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100/50 shadow-sm text-center">
-              <div className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-white mx-auto mb-4 shadow-md shadow-blue-500/20">
-                <Sparkles size={24} />
-              </div>
-              <h3 className="font-bold text-gray-900 text-base mb-2">Đánh giá Độ phù hợp</h3>
-              <p className="text-xs text-gray-500 font-medium mb-6">
-                Sử dụng AI phân tích CV của bạn để đối chiếu tức thì với các yêu cầu kỹ thuật của công việc này.
-              </p>
-
-              {matchMutation.isPending ? (
-                <div className="flex flex-col items-center justify-center py-2">
-                  <Loader2 className="animate-spin text-blue-600 w-8 h-8 mb-2" />
-                  <p className="text-xs text-blue-700 font-bold animate-pulse">{statusMessage}</p>
-                </div>
-              ) : (
-                <button
-                  onClick={handleStartMatching}
-                  disabled={isProfileLoading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-55 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition-all cursor-pointer"
-                >
-                  {isProfileLoading ? "Đang tải hồ sơ..." : "So khớp hồ sơ của tôi"}
-                </button>
-              )}
+        {/* Skills */}
+        {job.skillsRequired.length > 0 && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">Kỹ năng yêu cầu</h3>
+            <div className="flex flex-wrap gap-2">
+              {job.skillsRequired.map((s, i) => (
+                <span key={i} className="py-1 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300">{s}</span>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Match Score Display */}
-          {matchResult && (
-            <div className="space-y-6 animate-fade-in">
-              <MatchScoreDial score={matchResult.overall_score} />
-              
-              <RequirementMatrixView matrix={matchResult.match_matrix} />
-
-              <div className="text-center">
-                <button
-                  onClick={() => setMatchResult(null)}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-all cursor-pointer"
-                >
-                  Xóa kết quả & So khớp lại
-                </button>
+        {/* Description / requirements / benefits */}
+        {[
+          { title: "Mô tả công việc", content: job.description },
+          { title: "Yêu cầu", content: job.requirements },
+          { title: "Quyền lợi", content: job.benefits },
+        ].map(
+          (sec) =>
+            sec.content && (
+              <div key={sec.title} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-2">
+                <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">{sec.title}</h3>
+                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-line">{sec.content}</p>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )
+        )}
+      </main>
+    </div>
+  );
+}
+
     </div>
   );
 }

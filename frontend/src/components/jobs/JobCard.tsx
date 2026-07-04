@@ -2,51 +2,96 @@
 
 import React from "react";
 import Link from "next/link";
-import { Briefcase, MapPin, DollarSign, ArrowRight } from "lucide-react";
-import { Job } from "@/lib/services/job";
+import { Bookmark, BookmarkCheck, MapPin, Building2, Wallet, Clock } from "lucide-react";
+import { JobSummary } from "@/lib/services/jobs";
 
 interface JobCardProps {
-  job: Job;
+  job: JobSummary;
+  onBookmarkToggle: (job: JobSummary) => void;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job }) => {
+const relativeDate = (iso: string | null): string => {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days <= 0) return "Hôm nay";
+  if (days === 1) return "Hôm qua";
+  if (days < 30) return `${days} ngày trước`;
+  return `${Math.floor(days / 30)} tháng trước`;
+};
+
+export const JobCard: React.FC<JobCardProps> = ({ job, onBookmarkToggle }) => {
   return (
-    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
-      <div>
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div>
-            <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-1">{job.job_title}</h3>
-            <p className="text-sm text-gray-500 font-medium">{job.employer_name}</p>
-          </div>
-        </div>
-
-        <p className="text-sm text-gray-600 line-clamp-3 mb-4">{job.job_description}</p>
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 mb-5">
-          <div className="flex items-center gap-1">
-            <MapPin size={14} className="text-gray-400" />
-            <span>{job.job_city || "Từ xa"}, {job.job_country}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <DollarSign size={14} className="text-gray-400" />
-            <span>
-              {job.job_max_salary 
-                ? `${job.job_max_salary.toLocaleString()} ${job.job_salary_currency || "USD"}`
-                : "Thỏa thuận"}
-            </span>
-          </div>
-        </div>
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition duration-200 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <Link href={`/jobs/${job.id}`} className="flex-1 min-w-0 group">
+          <h3 className="font-extrabold text-base text-zinc-900 dark:text-white truncate group-hover:text-primary transition">
+            {job.title}
+          </h3>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground mt-0.5">
+            <Building2 className="h-3.5 w-3.5 shrink-0" /> {job.company}
+          </p>
+        </Link>
+        <button
+          onClick={() => onBookmarkToggle(job)}
+          aria-label={job.isBookmarked ? "Bỏ lưu" : "Lưu việc làm"}
+          className="shrink-0 h-9 w-9 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+        >
+          {job.isBookmarked ? (
+            <BookmarkCheck className="h-4.5 w-4.5 text-primary" />
+          ) : (
+            <Bookmark className="h-4.5 w-4.5 text-zinc-400" />
+          )}
+        </button>
       </div>
 
-      <div className="pt-3 border-t border-gray-50 flex items-center justify-end">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-medium text-muted-foreground">
+        {job.location && (
+          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {job.location}</span>
+        )}
+        {job.salaryRange && (
+          <span className="flex items-center gap-1 text-success font-bold"><Wallet className="h-3.5 w-3.5" /> {job.salaryRange}</span>
+        )}
+        {job.employmentType && (
+          <span className="py-0.5 px-2 rounded-full bg-primary/10 text-primary font-bold uppercase tracking-wide text-[10px]">
+            {job.employmentType}
+          </span>
+        )}
+        {job.postedDate && (
+          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {relativeDate(job.postedDate)}</span>
+        )}
+      </div>
+
+      {job.skillsRequired.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {job.skillsRequired.slice(0, 6).map((s, i) => (
+            <span key={i} className="py-0.5 px-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+              {s}
+            </span>
+          ))}
+          {job.skillsRequired.length > 6 && (
+            <span className="py-0.5 px-2 text-[11px] font-bold text-muted-foreground">
+              +{job.skillsRequired.length - 6}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
         <Link
-          href={`/jobs/${job.job_id}`}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+          href={`/jobs/${job.id}`}
+          className="flex-1 text-center py-2 px-3 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 text-xs font-bold hover:opacity-90 transition"
         >
-          <span>Xem chi tiết & So khớp</span>
-          <ArrowRight size={14} />
+          Xem chi tiết
         </Link>
       </div>
     </div>
   );
 };
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+export default JobCard;

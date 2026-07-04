@@ -1,0 +1,66 @@
+# Render Blueprint — MockAI backend (infra-as-code).
+# Spec: https://render.com/docs/blueprint-spec
+#
+# Secrets and DATABASE_URL are intentionally NOT in this file — set them in the
+# Render dashboard (they render as `sync: false` below). Non-secret prod values
+# ARE pinned here so deploys are reproducible and match the Environment Matrix.
+
+databases:
+  - name: mockai-db
+    databaseName: mockai
+    user: mockai
+    plan: free
+
+services:
+  - type: web
+    name: mockai-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:3000,https://mock-ai-ci26.vercel.app
+      - key: FRONTEND_URL
+        value: https://mock-ai-ci26.vercel.app
+      - key: GOOGLE_REDIRECT_URI
+        value: https://net-bzr9.onrender.com/api/v1/auth/google/callback
+      - key: JSEARCH_COUNTRY
+        value: vn
+      - key: JSEARCH_DATE_POSTED
+        value: all
+
+      # --- Set manually in the dashboard (sync: false) ---
+      # DATABASE_URL: use the database's EXTERNAL connection string but rewrite
+      # the scheme to `postgresql+asyncpg://` (the app uses an async engine and
+      # config validation rejects a sync URL).
+      - key: DATABASE_URL
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DB
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JSEARCH_API_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false

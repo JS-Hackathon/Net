@@ -16,6 +16,10 @@ if not is_sqlite:
 
 engine = create_async_engine(
     settings.DATABASE_URL,
+    echo=settings.SQL_ECHO,  # verbose SQL logging is opt-in (SQL_ECHO=true)
+    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=10,
     **engine_kwargs
 )
 
